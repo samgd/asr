@@ -1,0 +1,49 @@
+[project]
+name = "asr"
+version = "0.1.0"
+description = "Automatic speech recognition algorithm implementation test bed."
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+  "einx>=0.4.3",
+  "jaxtyping>=0.3.9",
+  "jupyterlab>=4.5.7",
+  "matplotlib>=3.10.9",
+  "nvidia-npp>=13.1.0.48",
+  "torch>=2.11.0",
+  "torchaudio>=2.11.0",
+  "torchcodec>=0.11",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.uv.sources]
+torch = [{ index = "pytorch-cu130" }]
+torchaudio = [{ index = "pytorch-cu130" }]
+torchcodec = [{ index = "pytorch-cu130" }]
+
+[[tool.uv.index]]
+name = "pytorch-cu130"
+url = "https://download.pytorch.org/whl/cu130"
+explicit = true
+
+[dependency-groups]
+dev = ["ruff>=0.8", "pytest>=8"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+# jaxtyping shape strings trip F722/F821, see FAQ
+ignore = ["F722", "F821"]
+
+[tool.ruff.format]
+docstring-code-format = true
+
+[tool.pytest.ini_options]
+addopts = "--doctest-modules"
+testpaths = ["src"]
