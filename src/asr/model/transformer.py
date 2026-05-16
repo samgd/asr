@@ -2,7 +2,7 @@ from typing import cast
 
 import torch
 from einx import rearrange  # pyright: ignore[reportPrivateImportUsage]
-from jaxtyping import Float
+from jaxtyping import Float, Integer
 
 from asr.model.rotary import RotaryEmbedding
 
@@ -22,7 +22,7 @@ class MHA(torch.nn.Module):
         self,
         d_model: int,
         n_head: int,
-        is_causal: bool = False,
+        is_causal: bool,
         device: torch.device | None = None,
         dtype: torch.dtype | None = None,
     ):
@@ -36,15 +36,37 @@ class MHA(torch.nn.Module):
         self.Wqkv = torch.nn.Linear(d_model, 3 * d_model, bias=False, device=device, dtype=dtype)
         self.Wout = torch.nn.Linear(d_model, d_model, bias=False, device=device, dtype=dtype)
 
-    def forward(self, x: Float[torch.Tensor, "batch seq_len d_model"]) -> Float[torch.Tensor, "batch seq_len d_model"]:
+    def forward(
+        self, x: Float[torch.Tensor, "batch seq_len d_model"], seqlens: Integer[torch.Tensor, "batch"] | None = None
+    ) -> Float[torch.Tensor, "batch seq_len d_model"]:
         """Apply causal multi-head self-attention to the input sequence."""
-        B, L, H = x.shape
+        B, L, _ = x.shape
         q, k, v = self.Wqkv(x).view(B, L, 3, self.n_head, self.head_dim).unbind(dim=2)
-        q = cast(torch.Tensor, rearrange("B L nh hd -> (B nh) L hd", self.rope(q)))
-        k = cast(torch.Tensor, rearrange("B L nh hd -> (B nh) L hd", self.rope(k)))
-        v = cast(torch.Tensor, rearrange("B L nh hd -> (B nh) L hd", v))
-        h = torch.nn.functional.scaled_dot_product_attention(q, k, v, is_causal=self.is_causal)
-        h = rearrange("(B nh) L hd -> B L (nh hd)", h, B=B, L=L, nh=self.n_head, hd=self.head_dim)
+
+        q = cast(torch.Tensor, rearrange("B L nh hd -> B nh L hd", self.rope(q)))
+        k = cast(torch.Tensor, rearrange("B L nh hd -> B nh L hd", self.rope(k)))
+        v = cast(torch.Tensor, rearrange("B L nh hd -> B nh L hd", v))
+
+        valid = None
+        attn_mask = None
+        is_causal = self.is_causal
+        if seqlens is not None:
+            positions = torch.arange(L, device=x.device)
+            valid = positions[None, :] < seqlens.to(device=x.device)[:, None]  # B L
+            attn_mask = valid[:, None, None, :]  # B 1 1 L
+            if self.is_causal:
+                attn_mask = attn_mask & (positions[None, :] <= positions[:, None])[None, None, :, :]
+                is_causal = False
+
+        h = torch.nn.functional.scaled_dot_product_attention(
+            q,
+            k,
+            v,
+            attn_mask=attn_mask,
+            dropout_p=0.0,
+            is_causal=is_causal,
+        )
+        h = cast(torch.Tensor, rearrange("B nh L hd -> B L (nh hd)", h))
         h = self.Wout(h)
         return h
 
@@ -104,9 +126,11 @@ class TransformerBlock(torch.nn.Module):
         self.mha = MHA(d_model, n_head, is_causal, device=device, dtype=dtype)
         self.ff = SwiGLU(d_model, d_ff, device=device, dtype=dtype)
 
-    def forward(self, x: Float[torch.Tensor, "batch seq_len d_model"]) -> Float[torch.Tensor, "batch seq_len d_model"]:
+    def forward(
+        self, x: Float[torch.Tensor, "batch seq_len d_model"], seqlens: Integer[torch.Tensor, "batch"] | None = None
+    ) -> Float[torch.Tensor, "batch seq_len d_model"]:
         """Apply feedforward and attention with pre-norm and residual components for each."""
-        h = x + self.mha(self.norm1(x))
+        h = x + self.mha(self.norm1(x), seqlens)
         o = h + self.ff(self.norm2(h))
         return o
 
@@ -143,7 +167,10 @@ class Transformer(torch.nn.Module):
         self.proj = torch.nn.Linear(d_model, n_vocab, bias=False, device=device, dtype=dtype)
 
     def forward(
-        self, data: Float[torch.Tensor, "batch seq_len d_model"]
+        self, data: Float[torch.Tensor, "batch seq_len d_model"], seqlens: Integer[torch.Tensor, "batch"] | None = None
     ) -> Float[torch.Tensor, "batch seq_len n_vocab"]:
         """Run transformer layers, normalize, and project to logits."""
-        return self.proj(self.norm(self.layers(data)))
+        h = data
+        for layer in self.layers:
+            h = layer(h, seqlens)
+        return self.proj(self.norm(h))
