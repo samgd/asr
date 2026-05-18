@@ -47,4 +47,7 @@ docstring-code-format = true
 
 [tool.pytest.ini_options]
 addopts = "--doctest-modules"
-testpaths = ["src"]
+testpaths = ["src", "tests"]
+markers = [
+  "cuda: test requires a CUDA device (auto-skipped when unavailable)",
+]
