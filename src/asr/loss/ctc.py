@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
@@ -67,3 +68,10 @@ class CTCLoss(torch.nn.Module):
                 return loss
             case _:
                 raise NotImplementedError(f"unknown reduction {self.reduction}")
+
+
+@dataclass
+class CTCLossConfig:
+    _target_ = "asr.loss.ctc.CTCLoss"
+    reduction: str = "mean"
+    zero_infinity: bool = True

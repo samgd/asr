@@ -1,8 +1,10 @@
 import os
+from dataclasses import dataclass, field
 from typing import Literal
 
 import torch
 from jaxtyping import Float, Int64
+from omegaconf import MISSING
 from torch.utils.data import Dataset
 from torchaudio.datasets import LIBRISPEECH
 from torchaudio.transforms import MelSpectrogram
@@ -43,6 +45,12 @@ class CharTokenizer:
     def decode(self, ids: list[int], skip_specials: bool = True) -> str:
         special_ids = {self.s2i[s] for s in self.specials} if skip_specials else set()
         return "".join(self.i2s[i] for i in ids if i not in special_ids)
+
+
+@dataclass
+class CharTokenizerConfig:
+    __target__: str = "asr.data.CharTokenizer"
+    specials: list[str] = field(default_factory=list)
 
 
 def collate_fn(samples: list[Sample]) -> Batch:
@@ -87,9 +95,12 @@ class LibriSpeech(Dataset[Sample]):
         n_fft: int = 512,
         f_min: float = 40.0,
         f_max: float | None = 8000.0,
+        root: str | None = None,
         **kwargs,
     ):
-        self.base = LIBRISPEECH(root=os.environ["DATA_ROOT"], url=subset, **kwargs)
+        if root is None:
+            root = os.environ["DATA_ROOT"]
+        self.base = LIBRISPEECH(root=root, url=subset, **kwargs)
         self.tok = tokenizer
         self.mel = MelSpectrogram(
             sample_rate=sample_rate,
@@ -109,3 +120,17 @@ class LibriSpeech(Dataset[Sample]):
         feats = self.mel(wav).squeeze(0).clamp(min=1e-10).log().T
         ids = torch.tensor(self.tok.encode(text), dtype=torch.long)
         return feats, ids
+
+
+@dataclass
+class LibriSpeechConfig:
+    __target__: str = "asr.data.LibriSpeech"
+    subset: str = MISSING
+    sample_rate: int = 16_000
+    n_mels: int = 128
+    win_length: int = 400
+    hop_length: int = 160
+    n_fft: int = 512
+    f_min: float = 40.0
+    f_max: float | None = 8000.0
+    root: str | None = None

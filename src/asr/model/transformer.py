@@ -1,8 +1,10 @@
+from dataclasses import dataclass
 from typing import cast
 
 import torch
 from einx import rearrange  # pyright: ignore[reportPrivateImportUsage]
 from jaxtyping import Float, Integer
+from omegaconf import MISSING
 
 from asr.model.rotary import RotaryEmbedding
 
@@ -174,3 +176,14 @@ class Transformer(torch.nn.Module):
         for layer in self.layers:
             h = layer(h, seqlens)
         return self.proj(self.norm(h))
+
+
+@dataclass
+class TransformerConfig:
+    _target_: str = "asr.model.Transformer"
+    n_vocab: int = MISSING
+    depth: int = MISSING
+    d_model: int = MISSING
+    n_head: int = MISSING
+    is_causal: bool = MISSING
+    d_ff: int = MISSING
