@@ -17,8 +17,11 @@ dependencies = [
 ]
 
 [build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
+requires = ["setuptools>=77", "wheel", "torch>=2.11.0", "numpy"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
 
 [tool.uv.sources]
 torch = [{ index = "pytorch-cu130" }]
@@ -31,7 +34,11 @@ url = "https://download.pytorch.org/whl/cu130"
 explicit = true
 
 [dependency-groups]
-dev = ["ruff>=0.8", "pytest>=8"]
+dev = [
+    "ruff>=0.8",
+    "pytest>=8",
+    "clang-format>=22.1.5",
+]
 
 [tool.ruff]
 line-length = 120

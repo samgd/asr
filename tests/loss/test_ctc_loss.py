@@ -1,8 +1,7 @@
 import pytest
 import torch
 import torch.nn.functional as F
-
-from asr.loss.ctc_loss import CTCLoss, CTCLossFn
+from asr.loss.ctc.ctc_loss import CTCLoss, CTCLossFn
 
 ATOL = 1e-4
 RTOL = 1e-4

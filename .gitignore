@@ -6,6 +6,9 @@ dist/
 wheels/
 *.egg-info
 
+# Compiled files
+*.so
+
 # Virtual environments
 .venv
 
