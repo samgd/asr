@@ -3,7 +3,7 @@ from pathlib import Path
 from typing import Literal
 
 import torch
-from jaxtyping import Float, Int
+from jaxtyping import Float, Integer
 
 _so = next(Path(__file__).parent.glob("_C*.so"))
 torch.ops.load_library(str(_so))
@@ -33,9 +33,11 @@ class CTCLoss(torch.nn.Module):
         reduction: How to reduce the per-sample loss to a scalar.
             "mean" averages the length-normalized losses across the batch and "none" returns the per-sample tensor.
         zero_infinity: If True, replace ``-inf`` losses with 0 before reduction so they don't propagate gradients.
+        logit_input: If True, inputs are logits and have log_softmax applied in the loss.
 
     Shape:
-        log_probs: (B, T, V) log-probabilities over the vocabularly, including the blank symbol at index 0.
+        x: (B, T, V) log-probabilities - or logits if logit_input is True - over
+            the vocabularly, including the blank symbol at index 0.
         targets: (B, S_max) target label sequences.
         in_lens: (B,) valid input lengths in [1, T].
         tgt_lens: (B,) valid target lengths in [0, S_max].
@@ -46,19 +48,24 @@ class CTCLoss(torch.nn.Module):
         https://www.cs.toronto.edu/~graves/icml_2006.pdf
     """
 
-    def __init__(self, reduction: Literal["mean", "none"] = "mean", zero_infinity: bool = False):
+    def __init__(
+        self, reduction: Literal["mean", "none"] = "mean", zero_infinity: bool = False, logit_input: bool = False
+    ):
         super().__init__()
         self.reduction = reduction
         self.zero_infinity = zero_infinity
+        self.logit_input = True
 
     def forward(
         self,
-        log_probs: Float[torch.Tensor, "batch time vocab"],
-        targets: Int[torch.Tensor, "batch seq"],
-        in_lens: Int[torch.Tensor, "batch"],
-        tgt_lens: Int[torch.Tensor, "batch"],
+        x: Float[torch.Tensor, "batch time vocab"],
+        targets: Integer[torch.Tensor, "batch seq"],
+        in_lens: Integer[torch.Tensor, "batch"],
+        tgt_lens: Integer[torch.Tensor, "batch"],
     ) -> Float[torch.Tensor, "batch"]:
-        loss = CTCLossFn.apply(log_probs, targets, in_lens, tgt_lens)
+        if self.logit_input:
+            x = torch.log_softmax(x, dim=-1)
+        loss = CTCLossFn.apply(x, targets.int(), in_lens.int(), tgt_lens.int())
         if self.zero_infinity:
             loss[loss.isinf()] = 0.0
         match self.reduction:
@@ -72,6 +79,7 @@ class CTCLoss(torch.nn.Module):
 
 @dataclass
 class CTCLossConfig:
-    _target_ = "asr.loss.ctc.CTCLoss"
+    _target_: str = "asr.loss.ctc.CTCLoss"
     reduction: str = "mean"
-    zero_infinity: bool = True
+    zero_infinity: bool = False
+    logit_input: bool = False

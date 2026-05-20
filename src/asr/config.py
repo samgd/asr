@@ -4,9 +4,9 @@ from typing import Any
 from hydra.core.config_store import ConfigStore
 from omegaconf import MISSING
 
-from asr.data import CharTokenizerConfig
-from asr.loss.ctc import CTCLossConfig
-from asr.model.transformer import TransformerConfig
+from asr.data import CharTokenizerConfig, DataLoaderConfig, LibriSpeechConfig
+from asr.optim import AdamWConfig
+from asr.system.ctc import CTCSystemConfig
 
 
 @dataclass
@@ -14,22 +14,32 @@ class TrainConfig:
     defaults: list[Any] = field(
         default_factory=lambda: [
             "_self_",
-            {"model": MISSING},
-            {"loss": MISSING},
+            {"system": MISSING},
             {"tokenizer": MISSING},
-            {"data": MISSING},
+            {"dataset": MISSING},
+            {"dataloader": "default"},
+            {"optim": "adamw"},
         ]
     )
-    model: Any = MISSING
-    loss: Any = MISSING
+    system: Any = MISSING
     tokenizer: Any = MISSING
-    data: Any = MISSING
-    max_steps: int = 100_000
+    dataset: Any = MISSING
+    dataloader: Any = MISSING
+    optim: Any = MISSING
+    total_steps: int = MISSING
+    eval_every: int = MISSING
+    device: str = MISSING
 
 
 cs = ConfigStore.instance()
-cs.store(group="model", name="transformer", node=TransformerConfig)
-cs.store(group="loss", name="ctc", node=CTCLossConfig)
+
+cs.store(group="system", name="ctc", node=CTCSystemConfig)
+
 cs.store(group="tokenizer", name="char", node=CharTokenizerConfig)
-cs.store(group="data", name="librispeech", node=CharTokenizerConfig)
+
+cs.store(group="dataset", name="librispeech", node=LibriSpeechConfig)
+cs.store(group="dataloader", name="default", node=DataLoaderConfig)
+
+cs.store(group="optim", name="adamw", node=AdamWConfig)
+
 cs.store(name="config", node=TrainConfig)

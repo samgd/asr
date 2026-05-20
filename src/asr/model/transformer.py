@@ -138,7 +138,7 @@ class TransformerBlock(torch.nn.Module):
 
 
 class Transformer(torch.nn.Module):
-    """Stacked pre-norm transformer model with projection head.
+    """Stacked pre-norm transformer model.
 
     Args:
         depth: Number of transformer blocks.
@@ -152,7 +152,6 @@ class Transformer(torch.nn.Module):
 
     def __init__(
         self,
-        n_vocab: int,
         depth: int,
         d_model: int,
         n_head: int,
@@ -162,26 +161,20 @@ class Transformer(torch.nn.Module):
         dtype: torch.dtype | None = None,
     ):
         super().__init__()
+        self.d_model = d_model
         self.layers = torch.nn.Sequential(
             *[TransformerBlock(d_model, n_head, is_causal, d_ff, device=device, dtype=dtype) for _ in range(depth)]
         )
-        self.norm = torch.nn.RMSNorm(d_model, device=device, dtype=dtype)
-        self.proj = torch.nn.Linear(d_model, n_vocab, bias=False, device=device, dtype=dtype)
 
     def forward(
         self, data: Float[torch.Tensor, "batch seq_len d_model"], seqlens: Integer[torch.Tensor, "batch"] | None = None
     ) -> Float[torch.Tensor, "batch seq_len n_vocab"]:
-        """Run transformer layers, normalize, and project to logits."""
-        h = data
-        for layer in self.layers:
-            h = layer(h, seqlens)
-        return self.proj(self.norm(h))
+        return self.layers(data)
 
 
 @dataclass
 class TransformerConfig:
-    _target_: str = "asr.model.Transformer"
-    n_vocab: int = MISSING
+    _target_: str = "asr.model.transformer.Transformer"
     depth: int = MISSING
     d_model: int = MISSING
     n_head: int = MISSING

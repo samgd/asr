@@ -1,10 +1,10 @@
 import os
 from dataclasses import dataclass, field
-from typing import Literal
+from typing import Any, Literal
 
 import torch
 from jaxtyping import Float, Int64
-from omegaconf import MISSING
+from omegaconf import II, MISSING
 from torch.utils.data import Dataset
 from torchaudio.datasets import LIBRISPEECH
 from torchaudio.transforms import MelSpectrogram
@@ -28,6 +28,16 @@ Batch = tuple[
 ]
 
 
+@dataclass
+class DataLoaderConfig:
+    _target_: str = "torch.utils.data.DataLoader"
+    dataset: Any = MISSING
+    batch_size: int = MISSING
+    num_workers: int = 4
+    shuffle: bool = True
+    collate_fn: Any = field(default_factory=lambda: {"_target_": "asr.data.collate_fn", "_partial_": True})
+
+
 class CharTokenizer:
     ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ '"
 
@@ -49,7 +59,7 @@ class CharTokenizer:
 
 @dataclass
 class CharTokenizerConfig:
-    __target__: str = "asr.data.CharTokenizer"
+    _target_: str = "asr.data.CharTokenizer"
     specials: list[str] = field(default_factory=list)
 
 
@@ -100,7 +110,7 @@ class LibriSpeech(Dataset[Sample]):
     ):
         if root is None:
             root = os.environ["DATA_ROOT"]
-        self.base = LIBRISPEECH(root=root, url=subset, **kwargs)
+        self.base = LIBRISPEECH(root=root, url=subset)
         self.tok = tokenizer
         self.mel = MelSpectrogram(
             sample_rate=sample_rate,
@@ -124,7 +134,7 @@ class LibriSpeech(Dataset[Sample]):
 
 @dataclass
 class LibriSpeechConfig:
-    __target__: str = "asr.data.LibriSpeech"
+    _target_: str = "asr.data.LibriSpeech"
     subset: str = MISSING
     sample_rate: int = 16_000
     n_mels: int = 128
@@ -134,3 +144,4 @@ class LibriSpeechConfig:
     f_min: float = 40.0
     f_max: float | None = 8000.0
     root: str | None = None
+    feature_dim: int = II(".n_mels")

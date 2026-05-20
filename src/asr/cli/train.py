@@ -1,17 +1,20 @@
 import hydra
-from omegaconf import DictConfig, OmegaConf
+from omegaconf import DictConfig
 
 # Trigger ConfigStore.store(...) so Hydra knows schemas
 import asr.config  # noqa: F401
+from asr.train import Trainer
 
 
 @hydra.main(version_base=None, config_path="../conf", config_name="config")
 def main(cfg: DictConfig) -> None:
-    loss = hydra.utils.instantiate(cfg.loss)
     tokenizer = hydra.utils.instantiate(cfg.tokenizer)
-    data = hydra.utils.instantiate(cfg.data, tokenizer=tokenizer)
-    model = hydra.utils.instantiate(cfg.model, n_vocab=len(tokenizer))
-    print(OmegaConf.to_yaml(cfg))
+    dataset = hydra.utils.instantiate(cfg.dataset, tokenizer=tokenizer)
+    loader = hydra.utils.instantiate(cfg.dataloader, dataset=dataset)
+    system = hydra.utils.instantiate(cfg.system, n_vocab=len(tokenizer)).to(cfg.device)
+    optim = hydra.utils.instantiate(cfg.optim, params=system.parameters())
+
+    Trainer(loader, system, optim, cfg.device).train(cfg.total_steps, cfg.eval_every)
 
 
 if __name__ == "__main__":
