@@ -1,0 +1,13 @@
+from typing import Protocol, runtime_checkable
+
+import torch
+
+from asr.data import Batch
+
+
+@runtime_checkable
+class System(Protocol):
+    def train_step(self, batch: Batch) -> torch.Tensor: ...
+    def eval_step(self, batch: Batch) -> list[dict]: ...
+    def parameters(self) -> list[torch.Tensor]: ...
+    def to(self, device): ...

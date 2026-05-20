@@ -1,10 +1,23 @@
 from itertools import cycle, islice
+from typing import cast
 
 import torch
 
+from asr.data import Batch
+from asr.system import System
+
 
 class Trainer:
-    def __init__(self, loader, eval_loader, system, optim, sched, device, max_grad_norm: float | None = None):
+    def __init__(
+        self,
+        loader: torch.utils.data.DataLoader,
+        eval_loader: torch.utils.data.DataLoader,
+        system: System,
+        optim: torch.optim.Optimizer,
+        sched: torch.optim.lr_scheduler.LRScheduler,
+        device: str | torch.device,
+        max_grad_norm: float | None = None,
+    ):
         self.loader = loader
         self.eval_loader = eval_loader
         self.system = system
@@ -13,8 +26,8 @@ class Trainer:
         self.device = device
         self.max_grad_norm = max_grad_norm
 
-    def _to_device(self, batch):
-        return (d.to(self.device, non_blocking=True) for d in batch)
+    def _to_device(self, batch: Batch) -> Batch:
+        return cast(Batch, tuple(d.to(self.device, non_blocking=True) for d in batch))
 
     def train(self, total_steps: int, eval_steps: int | None, eval_every: int):
         for step, batch in enumerate(islice(cycle(self.loader), total_steps)):

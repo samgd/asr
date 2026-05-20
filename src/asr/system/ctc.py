@@ -4,6 +4,7 @@ import jiwer
 import torch
 from jaxtyping import Float
 
+from asr.data import Batch
 from asr.decode.ctc import greedy_decode
 from asr.loss.ctc import CTCLossConfig
 from asr.model.encoder import EncoderConfig
@@ -20,7 +21,7 @@ class CTCSystem(torch.nn.Module):
         self.loss = loss
         self.tokenizer = tokenizer
 
-    def train_step(self, batch) -> Float[torch.Tensor, ""]:
+    def train_step(self, batch: Batch) -> Float[torch.Tensor, ""]:
         x, y, xl, yl = batch
         with torch.autocast("cuda"):
             enc, xl = self.encoder(x, xl)
@@ -28,7 +29,7 @@ class CTCSystem(torch.nn.Module):
         log_probs = torch.log_softmax(logits.float(), dim=-1)
         return self.loss(log_probs, y, xl, yl).mean()
 
-    def eval_step(self, batch) -> list[dict]:
+    def eval_step(self, batch: Batch) -> list[dict]:
         x, y, xl, yl = batch
         with torch.autocast("cuda"):
             enc, xl = self.encoder(x, xl)
