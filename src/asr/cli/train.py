@@ -11,10 +11,12 @@ def main(cfg: DictConfig) -> None:
     tokenizer = hydra.utils.instantiate(cfg.tokenizer)
     dataset = hydra.utils.instantiate(cfg.dataset, tokenizer=tokenizer)
     loader = hydra.utils.instantiate(cfg.dataloader, dataset=dataset)
-    system = hydra.utils.instantiate(cfg.system, n_vocab=len(tokenizer)).to(cfg.device)
+    eval_dataset = hydra.utils.instantiate(cfg.eval_dataset, tokenizer=tokenizer)
+    eval_loader = hydra.utils.instantiate(cfg.eval_dataloader, dataset=eval_dataset)
+    system = hydra.utils.instantiate(cfg.system, n_vocab=len(tokenizer), tokenizer=tokenizer).to(cfg.device)
     optim = hydra.utils.instantiate(cfg.optim, params=system.parameters())
 
-    Trainer(loader, system, optim, cfg.device).train(cfg.total_steps, cfg.eval_every)
+    Trainer(loader, eval_loader, system, optim, cfg.device).train(cfg.total_steps, cfg.eval_steps, cfg.eval_every)
 
 
 if __name__ == "__main__":

@@ -18,6 +18,8 @@ class TrainConfig:
             {"tokenizer": MISSING},
             {"dataset": MISSING},
             {"dataloader": "default"},
+            {"eval_dataset": MISSING},
+            {"eval_dataloader": "default"},
             {"optim": "adamw"},
         ]
     )
@@ -25,8 +27,11 @@ class TrainConfig:
     tokenizer: Any = MISSING
     dataset: Any = MISSING
     dataloader: Any = MISSING
+    eval_dataset: Any = MISSING
+    eval_dataloader: Any = MISSING
     optim: Any = MISSING
     total_steps: int = MISSING
+    eval_steps: int | None = None
     eval_every: int = MISSING
     device: str = MISSING
 
@@ -39,6 +44,9 @@ cs.store(group="tokenizer", name="char", node=CharTokenizerConfig)
 
 cs.store(group="dataset", name="librispeech", node=LibriSpeechConfig)
 cs.store(group="dataloader", name="default", node=DataLoaderConfig)
+
+cs.store(group="eval_dataset", name="librispeech", node=LibriSpeechConfig)
+cs.store(group="eval_dataloader", name="default", node=DataLoaderConfig)
 
 cs.store(group="optim", name="adamw", node=AdamWConfig)
 

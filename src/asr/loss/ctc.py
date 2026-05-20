@@ -1,6 +1,5 @@
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Literal
 
 import torch
 from jaxtyping import Float, Integer
@@ -30,14 +29,10 @@ class CTCLoss(torch.nn.Module):
     """Connectionist Temporal Classification (CTC) Loss.
 
     Args:
-        reduction: How to reduce the per-sample loss to a scalar.
-            "mean" averages the length-normalized losses across the batch and "none" returns the per-sample tensor.
         zero_infinity: If True, replace ``-inf`` losses with 0 before reduction so they don't propagate gradients.
-        logit_input: If True, inputs are logits and have log_softmax applied in the loss.
 
     Shape:
-        x: (B, T, V) log-probabilities - or logits if logit_input is True - over
-            the vocabularly, including the blank symbol at index 0.
+        x: (B, T, V) log-probabilities over the vocabularly, including the blank symbol at index 0.
         targets: (B, S_max) target label sequences.
         in_lens: (B,) valid input lengths in [1, T].
         tgt_lens: (B,) valid target lengths in [0, S_max].
@@ -48,13 +43,9 @@ class CTCLoss(torch.nn.Module):
         https://www.cs.toronto.edu/~graves/icml_2006.pdf
     """
 
-    def __init__(
-        self, reduction: Literal["mean", "none"] = "mean", zero_infinity: bool = False, logit_input: bool = False
-    ):
+    def __init__(self, zero_infinity: bool = False):
         super().__init__()
-        self.reduction = reduction
         self.zero_infinity = zero_infinity
-        self.logit_input = True
 
     def forward(
         self,
@@ -63,23 +54,13 @@ class CTCLoss(torch.nn.Module):
         in_lens: Integer[torch.Tensor, "batch"],
         tgt_lens: Integer[torch.Tensor, "batch"],
     ) -> Float[torch.Tensor, "batch"]:
-        if self.logit_input:
-            x = torch.log_softmax(x, dim=-1)
         loss = CTCLossFn.apply(x, targets.int(), in_lens.int(), tgt_lens.int())
         if self.zero_infinity:
             loss[loss.isinf()] = 0.0
-        match self.reduction:
-            case "mean":
-                return (loss / tgt_lens).mean()
-            case "none":
-                return loss
-            case _:
-                raise NotImplementedError(f"unknown reduction {self.reduction}")
+        return loss / tgt_lens
 
 
 @dataclass
 class CTCLossConfig:
     _target_: str = "asr.loss.ctc.CTCLoss"
-    reduction: str = "mean"
     zero_infinity: bool = False
-    logit_input: bool = False
