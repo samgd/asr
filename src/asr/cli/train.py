@@ -15,8 +15,10 @@ def main(cfg: DictConfig) -> None:
     eval_loader = hydra.utils.instantiate(cfg.eval_dataloader, dataset=eval_dataset)
     system = hydra.utils.instantiate(cfg.system, n_vocab=len(tokenizer), tokenizer=tokenizer).to(cfg.device)
     optim = hydra.utils.instantiate(cfg.optim, params=system.parameters())
+    sched = hydra.utils.instantiate(cfg.sched, optimizer=optim)
 
-    Trainer(loader, eval_loader, system, optim, cfg.device).train(cfg.total_steps, cfg.eval_steps, cfg.eval_every)
+    trainer = Trainer(loader, eval_loader, system, optim, sched, cfg.device, cfg.max_grad_norm)
+    trainer.train(cfg.total_steps, cfg.eval_steps, cfg.eval_every)
 
 
 if __name__ == "__main__":

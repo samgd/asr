@@ -4,12 +4,14 @@ import torch
 
 
 class Trainer:
-    def __init__(self, loader, eval_loader, system, optim, device):
+    def __init__(self, loader, eval_loader, system, optim, sched, device, max_grad_norm: float | None = None):
         self.loader = loader
         self.eval_loader = eval_loader
         self.system = system
         self.optim = optim
+        self.sched = sched
         self.device = device
+        self.max_grad_norm = max_grad_norm
 
     def _to_device(self, batch):
         return (d.to(self.device, non_blocking=True) for d in batch)
@@ -19,8 +21,14 @@ class Trainer:
             self.optim.zero_grad()
             loss = self.system.train_step(self._to_device(batch))
             loss.backward()
+            if self.max_grad_norm is not None:
+                norm = torch.nn.utils.clip_grad_norm_(self.system.parameters(), self.max_grad_norm).cpu().item()
+            else:
+                norm = None
             self.optim.step()
-            print(step, loss.item())
+            lr = self.sched.get_last_lr()
+            self.sched.step()
+            print(step, loss.item(), norm, lr)
 
             if (step + 1) % eval_every == 0:
                 metrics = self.eval(eval_steps)
@@ -29,7 +37,7 @@ class Trainer:
     def eval(self, eval_steps: int | None = None) -> dict:
         rows = []
         for batch in islice(self.eval_loader, eval_steps):
-            with torch.inference_mode():
+            with torch.no_grad():
                 rows.extend(self.system.eval_step(self._to_device(batch)))
         return {
             "loss": sum(r["loss"] for r in rows) / len(rows),

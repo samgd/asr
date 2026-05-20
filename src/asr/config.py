@@ -6,6 +6,7 @@ from omegaconf import MISSING
 
 from asr.data import CharTokenizerConfig, DataLoaderConfig, LibriSpeechConfig
 from asr.optim import AdamWConfig
+from asr.sched import LinearWarmupCosineDecayConfig
 from asr.system.ctc import CTCSystemConfig
 
 
@@ -21,6 +22,7 @@ class TrainConfig:
             {"eval_dataset": MISSING},
             {"eval_dataloader": "default"},
             {"optim": "adamw"},
+            {"sched": "linear_warmup_cosine_decay"},
         ]
     )
     system: Any = MISSING
@@ -30,10 +32,12 @@ class TrainConfig:
     eval_dataset: Any = MISSING
     eval_dataloader: Any = MISSING
     optim: Any = MISSING
+    sched: Any = MISSING
     total_steps: int = MISSING
     eval_steps: int | None = None
     eval_every: int = MISSING
     device: str = MISSING
+    max_grad_norm: float | None = 1.0
 
 
 cs = ConfigStore.instance()
@@ -49,5 +53,7 @@ cs.store(group="eval_dataset", name="librispeech", node=LibriSpeechConfig)
 cs.store(group="eval_dataloader", name="default", node=DataLoaderConfig)
 
 cs.store(group="optim", name="adamw", node=AdamWConfig)
+
+cs.store(group="sched", name="linear_warmup_cosine_decay", node=LinearWarmupCosineDecayConfig)
 
 cs.store(name="config", node=TrainConfig)
