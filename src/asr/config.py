@@ -5,6 +5,7 @@ from hydra.core.config_store import ConfigStore
 from omegaconf import MISSING
 
 from asr.data import CharTokenizerConfig, DataLoaderConfig, LibriSpeechConfig
+from asr.logging import TqdmLoggerConfig
 from asr.optim import AdamWConfig
 from asr.sched import LinearWarmupCosineDecayConfig
 from asr.system.ctc import CTCSystemConfig
@@ -23,6 +24,7 @@ class TrainConfig:
             {"eval_dataloader": "default"},
             {"optim": "adamw"},
             {"sched": "linear_warmup_cosine_decay"},
+            {"logger": MISSING},
         ]
     )
     system: Any = MISSING
@@ -33,6 +35,7 @@ class TrainConfig:
     eval_dataloader: Any = MISSING
     optim: Any = MISSING
     sched: Any = MISSING
+    logger: Any = MISSING
     total_steps: int = MISSING
     eval_steps: int | None = None
     eval_every: int = MISSING
@@ -55,5 +58,7 @@ cs.store(group="eval_dataloader", name="default", node=DataLoaderConfig)
 cs.store(group="optim", name="adamw", node=AdamWConfig)
 
 cs.store(group="sched", name="linear_warmup_cosine_decay", node=LinearWarmupCosineDecayConfig)
+
+cs.store(group="logger", name="tqdm", node=TqdmLoggerConfig)
 
 cs.store(name="config", node=TrainConfig)

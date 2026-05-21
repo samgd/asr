@@ -4,6 +4,7 @@ from typing import cast
 import torch
 
 from asr.data import Batch
+from asr.logging import Event, Logger
 from asr.system import System
 
 
@@ -15,6 +16,7 @@ class Trainer:
         system: System,
         optim: torch.optim.Optimizer,
         sched: torch.optim.lr_scheduler.LRScheduler,
+        logger: Logger,
         device: str | torch.device,
         max_grad_norm: float | None = None,
     ):
@@ -23,6 +25,7 @@ class Trainer:
         self.system = system
         self.optim = optim
         self.sched = sched
+        self.logger = logger
         self.device = device
         self.max_grad_norm = max_grad_norm
 
@@ -30,22 +33,24 @@ class Trainer:
         return cast(Batch, tuple(d.to(self.device, non_blocking=True) for d in batch))
 
     def train(self, total_steps: int, eval_steps: int | None, eval_every: int):
-        for step, batch in enumerate(islice(cycle(self.loader), total_steps)):
-            self.optim.zero_grad()
-            loss = self.system.train_step(self._to_device(batch))
-            loss.backward()
-            if self.max_grad_norm is not None:
-                norm = torch.nn.utils.clip_grad_norm_(self.system.parameters(), self.max_grad_norm).cpu().item()
-            else:
-                norm = None
-            self.optim.step()
-            lr = self.sched.get_last_lr()
-            self.sched.step()
-            print(step, loss.item(), norm, lr)
+        with self.logger as logger:
+            for step, batch in enumerate(islice(cycle(self.loader), total_steps), start=1):
+                self.optim.zero_grad()
+                loss = self.system.train_step(self._to_device(batch))
+                loss.backward()
+                if self.max_grad_norm is not None:
+                    norm = torch.nn.utils.clip_grad_norm_(self.system.parameters(), self.max_grad_norm).cpu().item()
+                else:
+                    norm = None
+                self.optim.step()
+                lr = self.sched.get_last_lr()
+                self.sched.step()
 
-            if (step + 1) % eval_every == 0:
-                metrics = self.eval(eval_steps)
-                print(metrics)
+                logger.append(Event("train", step, {"loss": loss.item(), "norm": norm, "lr": lr[0]}))
+
+                if step % eval_every == 0:
+                    metrics = self.eval(eval_steps)
+                    logger.append(Event("eval", step, metrics))
 
     def eval(self, eval_steps: int | None = None) -> dict:
         rows = []

@@ -16,8 +16,9 @@ def main(cfg: DictConfig) -> None:
     system = hydra.utils.instantiate(cfg.system, n_vocab=len(tokenizer), tokenizer=tokenizer).to(cfg.device)
     optim = hydra.utils.instantiate(cfg.optim, params=system.parameters())
     sched = hydra.utils.instantiate(cfg.sched, optimizer=optim)
+    logger = hydra.utils.instantiate(cfg.logger)
 
-    trainer = Trainer(loader, eval_loader, system, optim, sched, cfg.device, cfg.max_grad_norm)
+    trainer = Trainer(loader, eval_loader, system, optim, sched, logger, cfg.device, cfg.max_grad_norm)
     trainer.train(cfg.total_steps, cfg.eval_steps, cfg.eval_every)
 
 
