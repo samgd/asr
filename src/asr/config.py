@@ -6,6 +6,8 @@ from omegaconf import MISSING
 
 from asr.data import CharTokenizerConfig, DataLoaderConfig, LibriSpeechConfig
 from asr.logging import TqdmLoggerConfig
+from asr.model.encoder import ConvFrontendConfig, EncoderConfig
+from asr.model.transformer import TransformerConfig
 from asr.optim import AdamWConfig
 from asr.sched import LinearWarmupCosineDecayConfig
 from asr.system.ctc import CTCSystemConfig
@@ -46,6 +48,9 @@ class TrainConfig:
 cs = ConfigStore.instance()
 
 cs.store(group="system", name="ctc", node=CTCSystemConfig)
+cs.store(group="system/encoder", name="default", node=EncoderConfig)
+cs.store(group="system/encoder/frontend", name="conv", node=ConvFrontendConfig)
+cs.store(group="system/encoder/stem", name="transformer", node=TransformerConfig)
 
 cs.store(group="tokenizer", name="char", node=CharTokenizerConfig)
 

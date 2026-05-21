@@ -1,13 +1,14 @@
 from dataclasses import dataclass, field
+from typing import Any
 
 import jiwer
 import torch
 from jaxtyping import Float
+from omegaconf import MISSING
 
 from asr.data import Batch
 from asr.decode.ctc import greedy_decode
 from asr.loss.ctc import CTCLossConfig
-from asr.model.encoder import EncoderConfig
 
 
 class CTCSystem(torch.nn.Module):
@@ -50,6 +51,12 @@ class CTCSystem(torch.nn.Module):
 
 @dataclass
 class CTCSystemConfig:
+    defaults: list[Any] = field(
+        default_factory=lambda: [
+            "_self_",
+            {"encoder": "default"},
+        ]
+    )
     _target_: str = "asr.system.ctc.CTCSystem"
-    encoder: EncoderConfig = field(default_factory=EncoderConfig)
+    encoder: Any = MISSING
     loss: CTCLossConfig = field(default_factory=CTCLossConfig)

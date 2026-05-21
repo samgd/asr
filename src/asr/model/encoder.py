@@ -1,9 +1,8 @@
 from dataclasses import dataclass, field
+from typing import Any
 
 import torch
 from omegaconf import II, MISSING
-
-from asr.model.transformer import TransformerConfig
 
 
 def _make_norm(kind: str, channels: int) -> torch.nn.Module:
@@ -97,6 +96,13 @@ class ConvFrontendConfig:
 
 @dataclass
 class EncoderConfig:
+    defaults: list[Any] = field(
+        default_factory=lambda: [
+            "_self_",
+            {"frontend": "conv"},
+            {"stem": "transformer"},
+        ]
+    )
     _target_: str = "asr.model.encoder.Encoder"
-    frontend: ConvFrontendConfig = field(default_factory=ConvFrontendConfig)
-    stem: TransformerConfig = field(default_factory=TransformerConfig)
+    frontend: Any = MISSING
+    stem: Any = MISSING
