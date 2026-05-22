@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Literal
 
 import jiwer
 import torch
@@ -7,12 +7,12 @@ from jaxtyping import Float
 from omegaconf import MISSING
 
 from asr.data import Batch
-from asr.decode.ctc import greedy_decode
+from asr.decode.ctc import beam_decode, greedy_decode
 from asr.loss.ctc import CTCLossConfig
 
 
 class CTCSystem(torch.nn.Module):
-    def __init__(self, encoder, loss, n_vocab: int, tokenizer):
+    def __init__(self, encoder, loss, n_vocab: int, tokenizer, decode: Literal["greedy", "beam"]):
         super().__init__()
         self.encoder = encoder
         self.head = torch.nn.Sequential(
@@ -21,6 +21,14 @@ class CTCSystem(torch.nn.Module):
         )
         self.loss = loss
         self.tokenizer = tokenizer
+        self.decode = decode
+        match self.decode:
+            case "greedy":
+                self.decode_fn = greedy_decode
+            case "beam":
+                self.decode_fn = beam_decode
+            case _:
+                raise NotImplementedError()
 
     def train_step(self, batch: Batch) -> Float[torch.Tensor, ""]:
         x, y, xl, yl = batch
@@ -37,7 +45,7 @@ class CTCSystem(torch.nn.Module):
             logits = self.head(enc)
         log_probs = torch.log_softmax(logits.float(), dim=-1)
         loss_per = self.loss(log_probs, y, xl, yl)
-        hyps = greedy_decode(log_probs, xl)
+        hyps = self.decode_fn(log_probs, xl)
         out = []
         for i in range(loss_per.shape[0]):
             ref = self.tokenizer.decode(y[i, : yl[i]].tolist())
@@ -60,3 +68,4 @@ class CTCSystemConfig:
     _target_: str = "asr.system.ctc.CTCSystem"
     encoder: Any = MISSING
     loss: CTCLossConfig = field(default_factory=CTCLossConfig)
+    decode: str = "beam"
