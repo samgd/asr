@@ -120,9 +120,12 @@ __global__ void ctc_beta_kernel(const float* __restrict__ log_probs,  // (B, T, 
                                 const float* __restrict__ log_Z,      // (B,)
                                 const float* __restrict__ grad_loss,  // (B,)
                                 float* __restrict__ grad_logits,      // (B, T, V)
-                                int T_max, int Lp_max, int V, int S_max) {
+                                int T_max, int Lp_max, int V, int S_max, bool zero_infinity) {
     const int b = blockIdx.x;  // batch index
     if (tgt_lens[b] == 0) {
+        return;
+    }
+    if (zero_infinity && !isfinite(log_Z[b])) {
         return;
     }
     const int Lp_b = 2 * tgt_lens[b] + 1;
@@ -237,7 +240,7 @@ std::tuple<torch::stable::Tensor, torch::stable::Tensor> ctc_alpha_cuda(const to
 torch::stable::Tensor ctc_grad_cuda(const torch::stable::Tensor& alpha, const torch::stable::Tensor& log_Z,
                                     const torch::stable::Tensor& log_probs, const torch::stable::Tensor& targets,
                                     const torch::stable::Tensor& in_lens, const torch::stable::Tensor& tgt_lens,
-                                    const torch::stable::Tensor& grad_loss) {
+                                    const torch::stable::Tensor& grad_loss, bool zero_infinity) {
     CHECK_F32_INPUT(alpha);
     CHECK_F32_INPUT(log_Z);
     CHECK_F32_INPUT(log_probs);
@@ -260,7 +263,7 @@ torch::stable::Tensor ctc_grad_cuda(const torch::stable::Tensor& alpha, const to
     ctc_beta_kernel<<<B, threads, 2 * Lp_max * sizeof(float), get_stream(log_probs)>>>(
         log_probs.const_data_ptr<float>(), targets.const_data_ptr<int>(), in_lens.const_data_ptr<int>(),
         tgt_lens.const_data_ptr<int>(), alpha.const_data_ptr<float>(), log_Z.const_data_ptr<float>(),
-        grad_loss.const_data_ptr<float>(), grad_logits.mutable_data_ptr<float>(), T, Lp_max, V, S_max);
+        grad_loss.const_data_ptr<float>(), grad_logits.mutable_data_ptr<float>(), T, Lp_max, V, S_max, zero_infinity);
 
     return grad_logits;
 }

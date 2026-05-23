@@ -10,19 +10,23 @@ torch.ops.load_library(str(_so))
 
 class CTCLossFn(torch.autograd.Function):
     @staticmethod
-    def forward(ctx, log_probs, targets, in_lens, tgt_lens):
+    def forward(ctx, log_probs, targets, in_lens, tgt_lens, zero_infinity):
         alpha, log_Z = torch.ops.asr.ctc_alpha(log_probs, targets, in_lens, tgt_lens)
         ctx.save_for_backward(log_probs, alpha, log_Z, targets, in_lens, tgt_lens)
-        return -log_Z
+        ctx.zero_infinity = zero_infinity
+        loss = -log_Z
+        if zero_infinity:
+            loss = torch.where(torch.isfinite(loss), loss, torch.zeros_like(loss))
+        return loss
 
     @staticmethod
     def backward(ctx, *grad_outputs):
         (grad_loss,) = grad_outputs  # keep typing happy as backward expects varargs
         log_probs, alpha, log_Z, targets, in_lens, tgt_lens = ctx.saved_tensors
         grad_logits = torch.ops.asr.ctc_grad(
-            alpha, log_Z, log_probs, targets, in_lens, tgt_lens, grad_loss.contiguous()
+            alpha, log_Z, log_probs, targets, in_lens, tgt_lens, grad_loss.contiguous(), ctx.zero_infinity
         )
-        return grad_logits, None, None, None
+        return grad_logits, None, None, None, None
 
 
 class CTCLoss(torch.nn.Module):
@@ -54,9 +58,7 @@ class CTCLoss(torch.nn.Module):
         in_lens: Integer[torch.Tensor, "batch"],
         tgt_lens: Integer[torch.Tensor, "batch"],
     ) -> Float[torch.Tensor, "batch"]:
-        loss = CTCLossFn.apply(x, targets.int(), in_lens.int(), tgt_lens.int())
-        if self.zero_infinity:
-            loss[loss.isinf()] = 0.0
+        loss = CTCLossFn.apply(x, targets.int(), in_lens.int(), tgt_lens.int(), self.zero_infinity)
         return loss / tgt_lens
 
 
