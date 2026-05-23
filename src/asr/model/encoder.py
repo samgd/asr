@@ -110,7 +110,7 @@ class Encoder(torch.nn.Module):
     def forward(self, x, lengths=None):
         x = self.normalize(x, lengths)
         x, lengths = self.frontend(x, lengths)
-        out = self.stem(x)
+        out = self.stem(x, lengths)
         if lengths is None:
             return out
         return out, lengths
