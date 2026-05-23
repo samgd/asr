@@ -89,12 +89,6 @@ class BucketDataset(torch.utils.data.IterableDataset):
                     if self.total >= self.max_bucket_count:
                         # total bucket size exceeded, drop a sample from most full bucket
                         drop_idx = np.argmax(self.bucket_sizes)
-                        if bucket_idx == drop_idx:
-                            print(
-                                f"ASSERT FAILURE: bucket_idx={bucket_idx}, drop_idx={drop_idx}, "
-                                f"sizes={self.bucket_sizes}, total={self.total}, max={self.max_bucket_count}",
-                                flush=True,
-                            )
                         assert bucket_idx != drop_idx, "Should never drop bucket being filled."
                         self.buckets[drop_idx].popleft()
                         self.bucket_sizes[drop_idx] -= 1
