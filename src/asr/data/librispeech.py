@@ -34,11 +34,12 @@ class LibriSpeech(Dataset[Sample]):
         f_min: float = 40.0,
         f_max: float | None = 8000.0,
         root: str | None = None,
+        download: bool = False,
         **kwargs,
     ):
         if root is None:
             root = os.environ["DATA_ROOT"]
-        self.base = LIBRISPEECH(root=root, url=subset)
+        self.base = LIBRISPEECH(root=root, url=subset, download=download)
         self.tok = tokenizer
         self.mel = MelSpectrogram(
             sample_rate=sample_rate,
@@ -72,4 +73,5 @@ class LibriSpeechConfig:
     f_min: float = 40.0
     f_max: float | None = 8000.0
     root: str | None = None
+    download: bool = False
     feature_dim: int = II(".n_mels")
