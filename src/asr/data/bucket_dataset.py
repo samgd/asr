@@ -11,6 +11,29 @@ from asr.data.dataset import Batch, Sample, collate_fn
 
 
 class BucketDataset(torch.utils.data.IterableDataset):
+    """Stream length-bucketed batches from a weighted mixture of source datasets.
+
+    Samples are drawn from sources by weight, routed by length into K bucket buffers,
+    and emitted as variable-size batches drawn one bucket at a time (uniform random).
+
+    A batch grows until adding another sample would exceed ``batch_frame_budget``. The
+    buffer is capped at ``max_bucket_count`` samples. Overflow evicts the oldest sample
+    from the largest non-target bucket, preserving rare-bucket samples since rare
+    buckets are never the largest.
+
+    Args:
+        datasets: Source map-style datasets to draw from.
+        weights: Per-dataset sampling probabilities. Do not need to sum to 1.
+        boundaries: K+1 length cutoffs in feature frames defining K half-open buckets
+            ``[b_k, b_{k+1})``. Samples outside ``[boundaries[0], boundaries[-1])`` are
+            dropped.
+        batch_frame_budget: Maximum cumulative feature frames per batch. Must be at
+            least ``boundaries[-1]`` so any in-range sample can fit alone.
+        max_bucket_count: Cap on the total number of samples held across all bucket
+            buffers.
+        seed: Base seed. Combined with worker id for per-worker stream independence.
+    """
+
     def __init__(
         self,
         datasets: list[torch.utils.data.Dataset],
@@ -56,7 +79,7 @@ class BucketDataset(torch.utils.data.IterableDataset):
 
             while True:
                 while self.bucket_sizes[bucket_idx] == 0:
-                    # selected bucket empty, fill all buckets until selected bucket contains a sample
+                    # selected bucket empty, fill buckets until selected contains a sample
                     stream_idx = rng.choice(len(streams), p=self.norm_weights)
                     sample = next(streams[stream_idx])
                     fill_idx = np.searchsorted(self.boundaries, sample[0].shape[0], side="right") - 1
@@ -77,18 +100,20 @@ class BucketDataset(torch.utils.data.IterableDataset):
                         self.bucket_sizes[drop_idx] -= 1
                         self.total -= 1
 
+                # peak at next sample
                 sample = self.buckets[bucket_idx][0]
                 sample_frames = sample[0].shape[0]
 
                 if batch_frames + sample_frames > self.batch_frame_budget:
+                    # batch full; stop
                     break
 
+                # batch not full; pop sample, update sizes, and add to batch
                 self.buckets[bucket_idx].popleft()
                 self.bucket_sizes[bucket_idx] -= 1
                 self.total -= 1
-
-                batch.append(sample)
                 batch_frames += sample_frames
+                batch.append(sample)
 
             yield collate_fn(batch)
 
