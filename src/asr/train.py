@@ -1,11 +1,16 @@
-from itertools import cycle, islice
+from itertools import islice
 from typing import cast
 
 import torch
 
-from asr.data import Batch
+from asr.data.dataset import Batch
 from asr.logging import Event, Logger
 from asr.system import System
+
+
+def _repeat(loader):
+    while True:
+        yield from loader
 
 
 class Trainer:
@@ -34,7 +39,7 @@ class Trainer:
 
     def train(self, total_steps: int, eval_steps: int | None, eval_every: int):
         with self.logger as logger:
-            for step, batch in enumerate(islice(cycle(self.loader), total_steps), start=1):
+            for step, batch in enumerate(islice(_repeat(self.loader), total_steps), start=1):
                 self.optim.zero_grad()
                 loss = self.system.train_step(self._to_device(batch))
                 loss.backward()

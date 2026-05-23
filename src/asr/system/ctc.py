@@ -6,7 +6,7 @@ import torch
 from jaxtyping import Float
 from omegaconf import MISSING
 
-from asr.data import Batch
+from asr.data.dataset import Batch
 from asr.decode.ctc import beam_decode, greedy_decode
 from asr.loss.ctc import CTCLossConfig
 

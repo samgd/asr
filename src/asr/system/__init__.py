@@ -2,7 +2,7 @@ from typing import Protocol, runtime_checkable
 
 import torch
 
-from asr.data import Batch
+from asr.data.dataset import Batch
 
 
 @runtime_checkable

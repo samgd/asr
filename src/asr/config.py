@@ -4,7 +4,10 @@ from typing import Any
 from hydra.core.config_store import ConfigStore
 from omegaconf import MISSING
 
-from asr.data import CharTokenizerConfig, DataLoaderConfig, LibriSpeechConfig
+from asr.data.bucket_dataset import BucketDatasetConfig
+from asr.data.dataset import BucketDataLoaderConfig, DataLoaderConfig
+from asr.data.librispeech import LibriSpeechConfig
+from asr.data.tokenizer import CharTokenizerConfig
 from asr.logging import TqdmLoggerConfig
 from asr.model.encoder import ConvFrontendConfig, DynamicPerSamplePerFeatureNormConfig, EncoderConfig
 from asr.model.transformer import TransformerConfig
@@ -58,7 +61,9 @@ cs.store(group="system/encoder/stem", name="transformer", node=TransformerConfig
 cs.store(group="tokenizer", name="char", node=CharTokenizerConfig)
 
 cs.store(group="dataset", name="librispeech", node=LibriSpeechConfig)
+cs.store(group="dataset", name="bucket", node=BucketDatasetConfig)
 cs.store(group="dataloader", name="default", node=DataLoaderConfig)
+cs.store(group="dataloader", name="bucket", node=BucketDataLoaderConfig)
 
 cs.store(group="eval_dataset", name="librispeech", node=LibriSpeechConfig)
 cs.store(group="eval_dataloader", name="default", node=DataLoaderConfig)

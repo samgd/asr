@@ -9,7 +9,13 @@ from asr.train import Trainer
 @hydra.main(version_base=None, config_path="../conf", config_name="config")
 def main(cfg: DictConfig) -> None:
     tokenizer = hydra.utils.instantiate(cfg.tokenizer)
-    dataset = hydra.utils.instantiate(cfg.dataset, tokenizer=tokenizer)
+
+    if cfg.dataset._target_.endswith("BucketDataset"):
+        inner = [hydra.utils.instantiate(d, tokenizer=tokenizer) for d in cfg.dataset.datasets]
+        dataset = hydra.utils.instantiate(cfg.dataset, datasets=inner, _recursive_=False)
+    else:
+        dataset = hydra.utils.instantiate(cfg.dataset, tokenizer=tokenizer)
+
     loader = hydra.utils.instantiate(cfg.dataloader, dataset=dataset)
     eval_dataset = hydra.utils.instantiate(cfg.eval_dataset, tokenizer=tokenizer)
     eval_loader = hydra.utils.instantiate(cfg.eval_dataloader, dataset=eval_dataset)
