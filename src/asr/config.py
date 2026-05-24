@@ -7,9 +7,10 @@ from omegaconf import MISSING
 from asr.data.bucket_dataset import BucketDatasetConfig
 from asr.data.dataset import BucketDataLoaderConfig, DataLoaderConfig
 from asr.data.librispeech import LibriSpeechConfig
+from asr.data.norm import DynamicPerSamplePerFeatureNormConfig, GlobalNormConfig
 from asr.data.tokenizer import CharTokenizerConfig
 from asr.logging import TqdmLoggerConfig
-from asr.model.encoder import ConvFrontendConfig, DynamicPerSamplePerFeatureNormConfig, EncoderConfig
+from asr.model.encoder import ConvFrontendConfig, EncoderConfig
 from asr.model.transformer import TransformerConfig
 from asr.optim import AdamWConfig
 from asr.sched import LinearWarmupCosineDecayConfig
@@ -21,6 +22,7 @@ class TrainConfig:
     defaults: list[Any] = field(
         default_factory=lambda: [
             "_self_",
+            {"normalization": "dynamicpersample"},
             {"system": MISSING},
             {"tokenizer": MISSING},
             {"dataset": MISSING},
@@ -32,6 +34,7 @@ class TrainConfig:
             {"logger": MISSING},
         ]
     )
+    normalization: Any = MISSING
     system: Any = MISSING
     tokenizer: Any = MISSING
     dataset: Any = MISSING
@@ -52,16 +55,22 @@ cs = ConfigStore.instance()
 
 cs.store(group="system", name="ctc", node=CTCSystemConfig)
 cs.store(group="system/encoder", name="default", node=EncoderConfig)
-cs.store(
-    group="system/encoder/normalize", name="dynamicpersampleperfeaturenorm", node=DynamicPerSamplePerFeatureNormConfig
-)
 cs.store(group="system/encoder/frontend", name="conv", node=ConvFrontendConfig)
 cs.store(group="system/encoder/stem", name="transformer", node=TransformerConfig)
 
 cs.store(group="tokenizer", name="char", node=CharTokenizerConfig)
 
+cs.store(group="normalization", name="global", node=GlobalNormConfig)
+cs.store(group="normalization", name="dynamicpersample", node=DynamicPerSamplePerFeatureNormConfig)
+
+# cs.store(group="eval_dataset/augment", name="none", node=NoAugConfig)
+
 cs.store(group="dataset", name="librispeech", node=LibriSpeechConfig)
 cs.store(group="dataset", name="bucket", node=BucketDatasetConfig)
+
+# cs.store(group="dataset/augment", name="none", node=NoAugConfig)
+# cs.store(group="dataset/augment", name="specaug", node=SpecAugmentConfig)
+
 cs.store(group="dataloader", name="default", node=DataLoaderConfig)
 cs.store(group="dataloader", name="bucket", node=BucketDataLoaderConfig)
 

@@ -2,27 +2,8 @@ from dataclasses import dataclass, field
 from typing import Any
 
 import torch
-from jaxtyping import Float, Integer
+from jaxtyping import Float
 from omegaconf import II, MISSING
-
-
-class DynamicPerSamplePerFeatureNorm(torch.nn.Module):
-    def forward(
-        self, x: Float[torch.Tensor, "batch time features"], lengths: Float[Integer, "batch"] | None = None
-    ) -> Float[torch.Tensor, "batch time features"]:
-        with torch.autocast(x.device.type, enabled=False):
-            x = x.float()
-            if lengths is None:
-                mean = x.mean(dim=1, keepdim=True)
-                std = x.std(dim=1, keepdim=True)
-                return (x - mean) / std
-
-            mask = torch.arange(x.shape[1], device=x.device)[None, :, None] < lengths[:, None, None]
-            n = lengths[:, None, None].clamp_min(1).to(x.dtype)
-            mean = (x * mask).sum(dim=1, keepdim=True) / n
-            var = (((x - mean) * mask) ** 2).sum(dim=1, keepdim=True) / n
-            std = var.clamp_min(1e-10).sqrt()
-            return (x - mean) / std
 
 
 class LayerNorm(torch.nn.Module):
@@ -101,14 +82,12 @@ class ConvFrontend(torch.nn.Module):
 
 
 class Encoder(torch.nn.Module):
-    def __init__(self, frontend, stem, normalize):
+    def __init__(self, frontend, stem):
         super().__init__()
         self.frontend = frontend
         self.stem = stem
-        self.normalize = normalize
 
     def forward(self, x, lengths=None):
-        x = self.normalize(x, lengths)
         x, lengths = self.frontend(x, lengths)
         out = self.stem(x, lengths)
         if lengths is None:
@@ -118,11 +97,6 @@ class Encoder(torch.nn.Module):
     @property
     def out_dim(self) -> int:
         return self.stem.d_model
-
-
-@dataclass
-class DynamicPerSamplePerFeatureNormConfig:
-    _target_: str = "asr.model.encoder.DynamicPerSamplePerFeatureNorm"
 
 
 @dataclass
@@ -148,10 +122,8 @@ class EncoderConfig:
             "_self_",
             {"frontend": "conv"},
             {"stem": "transformer"},
-            {"normalize": "dynamicpersampleperfeaturenorm"},
         ]
     )
     _target_: str = "asr.model.encoder.Encoder"
     frontend: Any = MISSING
     stem: Any = MISSING
-    normalize: Any = MISSING

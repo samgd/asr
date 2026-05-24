@@ -1,6 +1,6 @@
 import os
 from dataclasses import dataclass
-from typing import Literal
+from typing import Any, Literal
 
 import torch
 from omegaconf import II, MISSING
@@ -8,7 +8,7 @@ from torch.utils.data import Dataset
 from torchaudio.datasets import LIBRISPEECH
 from torchaudio.transforms import MelSpectrogram
 
-from asr.data.dataset import Sample
+from asr.data.dataset import FeatureTransform, Sample
 
 
 class LibriSpeech(Dataset[Sample]):
@@ -34,12 +34,14 @@ class LibriSpeech(Dataset[Sample]):
         f_min: float = 40.0,
         f_max: float | None = 8000.0,
         root: str | None = None,
+        normalization: FeatureTransform | None = None,
         download: bool = False,
         **kwargs,
     ):
         if root is None:
             root = os.environ["DATA_ROOT"]
         self.base = LIBRISPEECH(root=root, url=subset, download=download)
+        self.normalization = normalization
         self.tok = tokenizer
         self.mel = MelSpectrogram(
             sample_rate=sample_rate,
@@ -57,6 +59,8 @@ class LibriSpeech(Dataset[Sample]):
     def __getitem__(self, i: int) -> Sample:
         wav, _, text, *_ = self.base[i]
         feats = self.mel(wav).squeeze(0).clamp(min=1e-10).log().T
+        if self.normalization is not None:
+            feats = self.normalization(feats)
         ids = torch.tensor(self.tok.encode(text), dtype=torch.long)
         return feats, ids
 
@@ -74,4 +78,5 @@ class LibriSpeechConfig:
     f_max: float | None = 8000.0
     root: str | None = None
     download: bool = False
+    normalization: Any = None
     feature_dim: int = II(".n_mels")

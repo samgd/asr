@@ -1,3 +1,4 @@
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -5,9 +6,12 @@ import torch
 from jaxtyping import Float, Int64
 from omegaconf import MISSING
 
+AudioFeatures = Float[torch.Tensor, "n_frames n_feats"]
+
+FeatureTransform = Callable[[AudioFeatures], AudioFeatures]
+
 Sample = tuple[
-    # Audio features
-    Float[torch.Tensor, "n_frames n_feats"],
+    AudioFeatures,
     # Transcription
     Int64[torch.Tensor, "seq_len"],
 ]
@@ -22,16 +26,6 @@ Batch = tuple[
     # Transcript lengths
     Int64[torch.Tensor, "batch"],
 ]
-
-
-@dataclass
-class DataLoaderConfig:
-    _target_: str = "torch.utils.data.DataLoader"
-    dataset: Any = MISSING
-    batch_size: int = MISSING
-    num_workers: int = 4
-    shuffle: bool = True
-    collate_fn: Any = field(default_factory=lambda: {"_target_": "asr.data.collate_fn", "_partial_": True})
 
 
 def collate_fn(samples: list[Sample]) -> Batch:
@@ -56,6 +50,16 @@ def collate_fn(samples: list[Sample]) -> Batch:
 
 def identity(x: Batch) -> Batch:
     return x
+
+
+@dataclass
+class DataLoaderConfig:
+    _target_: str = "torch.utils.data.DataLoader"
+    dataset: Any = MISSING
+    batch_size: int = MISSING
+    num_workers: int = 4
+    shuffle: bool = True
+    collate_fn: Any = field(default_factory=lambda: {"_target_": "asr.data.collate_fn", "_partial_": True})
 
 
 @dataclass
