@@ -38,6 +38,7 @@ class Trainer:
         return cast(Batch, tuple(d.to(self.device, non_blocking=True) for d in batch))
 
     def train(self, total_steps: int, eval_steps: int | None, eval_every: int):
+        self.system.train()
         with self.logger as logger:
             for step, batch in enumerate(islice(_repeat(self.loader), total_steps), start=1):
                 self.optim.zero_grad()
@@ -58,10 +59,13 @@ class Trainer:
                     logger.append(Event("eval", step, metrics))
 
     def eval(self, eval_steps: int | None = None) -> dict:
+        is_training = self.system.training
+        self.system.eval()
         rows = []
         for batch in islice(self.eval_loader, eval_steps):
             with torch.no_grad():
                 rows.extend(self.system.eval_step(self._to_device(batch)))
+        self.system.train(is_training)
         return {
             "loss": sum(r["loss"] for r in rows) / len(rows),
             "wer": 100 * sum(r["wer_edit"] for r in rows) / sum(r["wer_ref_len"] for r in rows),
