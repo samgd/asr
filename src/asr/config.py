@@ -22,7 +22,7 @@ class TrainConfig:
     defaults: list[Any] = field(
         default_factory=lambda: [
             "_self_",
-            {"normalization": "dynamicpersample"},
+            {"normalize": "dynamicpersample"},
             {"system": MISSING},
             {"tokenizer": MISSING},
             {"dataset": MISSING},
@@ -34,7 +34,7 @@ class TrainConfig:
             {"logger": MISSING},
         ]
     )
-    normalization: Any = MISSING
+    normalize: Any = MISSING
     system: Any = MISSING
     tokenizer: Any = MISSING
     dataset: Any = MISSING
@@ -60,8 +60,8 @@ cs.store(group="system/encoder/stem", name="transformer", node=TransformerConfig
 
 cs.store(group="tokenizer", name="char", node=CharTokenizerConfig)
 
-cs.store(group="normalization", name="global", node=GlobalNormConfig)
-cs.store(group="normalization", name="dynamicpersample", node=DynamicPerSamplePerFeatureNormConfig)
+cs.store(group="normalize", name="global", node=GlobalNormConfig)
+cs.store(group="normalize", name="dynamicpersample", node=DynamicPerSamplePerFeatureNormConfig)
 
 # cs.store(group="eval_dataset/augment", name="none", node=NoAugConfig)
 

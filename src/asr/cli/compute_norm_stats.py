@@ -4,11 +4,11 @@ Samples ``n_samples`` audio samples from the inner datasets under
 ``cfg.dataset.datasets`` (drawing each by ``cfg.dataset.weights``) and accumulates
 per-feature mean and standard deviation over every frame, in float64.
 
-Prints a paste-ready ``normalization`` config block. Drop it into a config (or
-save it as ``conf/normalization/<name>.yaml`` and select with
-``normalization=<name>``) to normalize with ``GlobalNorm``.
+Prints a paste-ready ``normalize`` config block. Drop it into a config (or
+save it as ``conf/normalize/<name>.yaml`` and select with
+``normalize=<name>``) to normalize with ``GlobalNorm``.
 
-Stats are computed from raw log-mel features, so leave ``normalization`` unset on
+Stats are computed from raw log-mel features, so leave ``normalize`` unset on
 the inner datasets here (it defaults to ``None``) or the stats will be wrong.
 
 Run with the same ``dataset=bucket dataset.datasets=[...] dataset.weights=[...]``
@@ -90,7 +90,7 @@ def main(cfg: DictConfig) -> None:
 
     print(f"\naccumulated {frames} frames from {cfg.n_samples} samples over {len(datasets)} dataset(s)")
     print(f"  feature_dim={mean.numel()}  subsets={subsets}  weights={cfg.dataset.weights}")
-    print("\npaste into the normalization group (recompute if mel settings change):\n")
+    print("\npaste into the normalize group (recompute if mel settings change):\n")
     print(f"# computed from {frames} frames; subsets={subsets} weights={list(cfg.dataset.weights)}")
     print("_target_: asr.data.norm.GlobalNorm")
     print(f"mean: [{mean_str}]")
