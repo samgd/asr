@@ -4,6 +4,7 @@ from typing import Any
 from hydra.core.config_store import ConfigStore
 from omegaconf import MISSING
 
+from asr.data.augment import TimeMaskConfig
 from asr.data.bucket_dataset import BucketDatasetConfig
 from asr.data.dataset import BucketDataLoaderConfig, DataLoaderConfig
 from asr.data.librispeech import LibriSpeechConfig
@@ -23,6 +24,7 @@ class TrainConfig:
         default_factory=lambda: [
             "_self_",
             {"normalize": "dynamicpersample"},
+            {"augment": None},
             {"system": MISSING},
             {"tokenizer": MISSING},
             {"dataset": MISSING},
@@ -35,6 +37,7 @@ class TrainConfig:
         ]
     )
     normalize: Any = MISSING
+    augment: Any = None
     system: Any = MISSING
     tokenizer: Any = MISSING
     dataset: Any = MISSING
@@ -53,6 +56,11 @@ class TrainConfig:
 
 cs = ConfigStore.instance()
 
+cs.store(group="normalize", name="global", node=GlobalNormConfig)
+cs.store(group="normalize", name="dynamicpersample", node=DynamicPerSamplePerFeatureNormConfig)
+
+cs.store(group="augment", name="timemask", node=TimeMaskConfig)
+
 cs.store(group="system", name="ctc", node=CTCSystemConfig)
 cs.store(group="system/encoder", name="default", node=EncoderConfig)
 cs.store(group="system/encoder/frontend", name="conv", node=ConvFrontendConfig)
@@ -60,16 +68,8 @@ cs.store(group="system/encoder/stem", name="transformer", node=TransformerConfig
 
 cs.store(group="tokenizer", name="char", node=CharTokenizerConfig)
 
-cs.store(group="normalize", name="global", node=GlobalNormConfig)
-cs.store(group="normalize", name="dynamicpersample", node=DynamicPerSamplePerFeatureNormConfig)
-
-# cs.store(group="eval_dataset/augment", name="none", node=NoAugConfig)
-
 cs.store(group="dataset", name="librispeech", node=LibriSpeechConfig)
 cs.store(group="dataset", name="bucket", node=BucketDatasetConfig)
-
-# cs.store(group="dataset/augment", name="none", node=NoAugConfig)
-# cs.store(group="dataset/augment", name="specaug", node=SpecAugmentConfig)
 
 cs.store(group="dataloader", name="default", node=DataLoaderConfig)
 cs.store(group="dataloader", name="bucket", node=BucketDataLoaderConfig)

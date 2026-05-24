@@ -35,6 +35,7 @@ class LibriSpeech(Dataset[Sample]):
         f_max: float | None = 8000.0,
         root: str | None = None,
         normalize: FeatureTransform | None = None,
+        augment: FeatureTransform | None = None,
         download: bool = False,
         **kwargs,
     ):
@@ -42,6 +43,7 @@ class LibriSpeech(Dataset[Sample]):
             root = os.environ["DATA_ROOT"]
         self.base = LIBRISPEECH(root=root, url=subset, download=download)
         self.normalize = normalize
+        self.augment = augment
         self.tok = tokenizer
         self.mel = MelSpectrogram(
             sample_rate=sample_rate,
@@ -61,6 +63,8 @@ class LibriSpeech(Dataset[Sample]):
         feats = self.mel(wav).squeeze(0).clamp(min=1e-10).log().T
         if self.normalize is not None:
             feats = self.normalize(feats)
+        if self.augment is not None:
+            feats = self.augment(feats)
         ids = torch.tensor(self.tok.encode(text), dtype=torch.long)
         return feats, ids
 
@@ -79,4 +83,5 @@ class LibriSpeechConfig:
     root: str | None = None
     download: bool = False
     normalize: Any = None
+    augment: Any = None
     feature_dim: int = II(".n_mels")

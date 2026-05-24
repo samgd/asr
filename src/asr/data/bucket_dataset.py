@@ -43,6 +43,7 @@ class BucketDataset(torch.utils.data.IterableDataset):
         max_bucket_count: int,
         seed: int = 0,
         normalize: FeatureTransform | None = None,
+        augment: FeatureTransform | None = None,
         **kwargs,
     ):
         assert len(datasets) == len(weights)
@@ -61,6 +62,7 @@ class BucketDataset(torch.utils.data.IterableDataset):
         self.max_bucket_count = max_bucket_count
         self.seed = seed
         self.normalize = normalize
+        self.augment = augment
 
         self.n_datasets = len(datasets)
         self.n_buckets = len(self.boundaries) - 1
@@ -129,6 +131,8 @@ class BucketDataset(torch.utils.data.IterableDataset):
                 continue
             if self.normalize is not None:
                 x = self.normalize(x)
+            if self.augment is not None:
+                x = self.augment(x)
             yield x, y
 
 
@@ -142,4 +146,5 @@ class BucketDatasetConfig:
     max_bucket_count: int = MISSING
     seed: int = 0
     normalize: Any = None
+    augment: Any = None
     feature_dim: int = MISSING
