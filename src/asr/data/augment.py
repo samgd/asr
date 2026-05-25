@@ -37,11 +37,31 @@ class TimeMask(torch.nn.Module):
         return x
 
 
-@dataclass
-class TimeMaskConfig:
-    _target_: str = "asr.data.augment.TimeMask"
-    max_n_mask_frame: int = MISSING
-    max_prop_mask_frame: float = 1.0
+class FreqMask(torch.nn.Module):
+    """Zero out a single contiguous span of frequency bins (SpecAugment freq masking).
+
+    Draws a mask width uniformly from ``[0, max_n_mask_freq]`` then places it at a
+    uniformly random start so it stays within the ``F`` frequencies, and sets those
+    frequencies to ``0``.
+
+    Masks in place.
+
+    Args:
+        max_n_mask_freq: Upper bound on the masked span in frequencies.
+    """
+
+    def __init__(self, max_n_mask_freq: int):
+        super().__init__()
+        self.max_n_mask_freq = max_n_mask_freq
+
+    def forward(self, x: AudioFeatures) -> AudioFeatures:
+        F = x.shape[1]
+        if self.max_n_mask_freq > F:
+            raise ValueError(f"max_n_mask_freq={self.max_n_mask_freq} exceeds the number of frequency bins F={F}")
+        mask_n = int(torch.randint(low=0, high=self.max_n_mask_freq + 1, size=()))
+        start = int(torch.randint(low=0, high=F - mask_n + 1, size=()))
+        x[:, start : start + mask_n] = 0.0
+        return x
 
 
 class Compose(torch.nn.Module):
@@ -55,6 +75,19 @@ class Compose(torch.nn.Module):
         for t in self.transforms:
             x = t(x)
         return x
+
+
+@dataclass
+class TimeMaskConfig:
+    _target_: str = "asr.data.augment.TimeMask"
+    max_n_mask_frame: int = MISSING
+    max_prop_mask_frame: float = 1.0
+
+
+@dataclass
+class FreqMaskConfig:
+    _target_: str = "asr.data.augment.FreqMask"
+    max_n_mask_freq: int = MISSING
 
 
 @dataclass
