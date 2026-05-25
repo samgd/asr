@@ -10,7 +10,7 @@ from asr.data.dataset import BucketDataLoaderConfig, DataLoaderConfig
 from asr.data.librispeech import LibriSpeechConfig
 from asr.data.norm import DynamicPerSamplePerFeatureNormConfig, GlobalNormConfig
 from asr.data.tokenizer import CharTokenizerConfig
-from asr.logging import TqdmLoggerConfig
+from asr.logging import AimLoggerConfig, TqdmLoggerConfig
 from asr.model.encoder import ConvFrontendConfig, EncoderConfig
 from asr.model.transformer import TransformerConfig
 from asr.optim import AdamWConfig
@@ -82,6 +82,7 @@ cs.store(group="optim", name="adamw", node=AdamWConfig)
 
 cs.store(group="sched", name="linear_warmup_cosine_decay", node=LinearWarmupCosineDecayConfig)
 
+cs.store(group="logger", name="aim", node=AimLoggerConfig)
 cs.store(group="logger", name="tqdm", node=TqdmLoggerConfig)
 
 cs.store(name="config", node=TrainConfig)

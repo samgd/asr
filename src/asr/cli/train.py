@@ -1,5 +1,5 @@
 import hydra
-from omegaconf import DictConfig
+from omegaconf import DictConfig, OmegaConf
 
 # Trigger ConfigStore.store(...) so Hydra knows schemas
 import asr.config  # noqa: F401
@@ -28,6 +28,7 @@ def main(cfg: DictConfig) -> None:
     optim = hydra.utils.instantiate(cfg.optim, params=system.parameters())
     sched = hydra.utils.instantiate(cfg.sched, optimizer=optim)
     logger = hydra.utils.instantiate(cfg.logger)
+    logger.set_config(OmegaConf.to_container(cfg, resolve=True))
 
     trainer = Trainer(loader, eval_loader, system, optim, sched, logger, cfg.device, cfg.max_grad_norm)
     trainer.train(cfg.total_steps, cfg.eval_steps, cfg.eval_every)

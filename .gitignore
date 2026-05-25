@@ -21,3 +21,4 @@ notebooks/
 
 # Training Runs
 outputs/
+logs/
