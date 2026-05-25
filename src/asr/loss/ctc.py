@@ -10,7 +10,8 @@ torch.ops.load_library(str(_so))
 
 class CTCLossFn(torch.autograd.Function):
     @staticmethod
-    def forward(ctx, log_probs, targets, in_lens, tgt_lens, zero_infinity):
+    def forward(ctx, logits, targets, in_lens, tgt_lens, zero_infinity):
+        log_probs = torch.nn.functional.log_softmax(logits.float(), dim=-1)
         alpha, log_Z = torch.ops.asr.ctc_alpha(log_probs, targets, in_lens, tgt_lens)
         ctx.save_for_backward(log_probs, alpha, log_Z, targets, in_lens, tgt_lens)
         ctx.zero_infinity = zero_infinity
@@ -59,7 +60,7 @@ class CTCLoss(torch.nn.Module):
         tgt_lens: Integer[torch.Tensor, "batch"],
     ) -> Float[torch.Tensor, "batch"]:
         loss = CTCLossFn.apply(x, targets.int(), in_lens.int(), tgt_lens.int(), self.zero_infinity)
-        return loss / tgt_lens
+        return loss / tgt_lens.clamp_min(1)
 
 
 @dataclass
