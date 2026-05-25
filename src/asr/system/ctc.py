@@ -32,19 +32,19 @@ class CTCSystem(torch.nn.Module):
 
     def train_step(self, batch: Batch) -> Float[torch.Tensor, ""]:
         x, y, xl, yl = batch
-        with torch.autocast("cuda"):
+        with torch.autocast("cuda", dtype=torch.bfloat16):
             enc, xl = self.encoder(x, xl)
             logits = self.head(enc)
-        log_probs = torch.log_softmax(logits.float(), dim=-1)
-        return self.loss(log_probs, y, xl, yl).mean()
+        # log_probs = torch.log_softmax(logits.float(), dim=-1)
+        return self.loss(logits, y, xl, yl).mean()
 
     def eval_step(self, batch: Batch) -> list[dict]:
         x, y, xl, yl = batch
-        with torch.autocast("cuda"):
+        with torch.autocast("cuda", dtype=torch.bfloat16):
             enc, xl = self.encoder(x, xl)
             logits = self.head(enc)
         log_probs = torch.log_softmax(logits.float(), dim=-1)
-        loss_per = self.loss(log_probs, y, xl, yl)
+        loss_per = self.loss(logits, y, xl, yl)
         hyps = self.decode_fn(log_probs, xl)
         out = []
         for i in range(loss_per.shape[0]):

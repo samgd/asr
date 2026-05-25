@@ -60,9 +60,6 @@ __global__ void ctc_alpha_kernel(const float* __restrict__ log_probs,  // (B, T,
                                  float* __restrict__ log_Z,            // (B,)
                                  int T_max, int Lp_max, int V, int S_max) {
     const int b = blockIdx.x;  // batch index
-    if (tgt_lens[b] == 0) {
-        return;
-    }
     const int Lp_b = 2 * tgt_lens[b] + 1;
     const int T_b = in_lens[b];
 
@@ -107,8 +104,13 @@ __global__ void ctc_alpha_kernel(const float* __restrict__ log_probs,  // (B, T,
     }
 
     if (threadIdx.x == 0) {
-        log_Z[b] = logaddexpf(alpha[alpha_idx(T_max, Lp_max, b, T_b - 1, Lp_b - 2)],
-                              alpha[alpha_idx(T_max, Lp_max, b, T_b - 1, Lp_b - 1)]);
+        if (Lp_b == 1) {
+            // empty target: only the all-blank path, terminating in the single blank state
+            log_Z[b] = alpha[alpha_idx(T_max, Lp_max, b, T_b - 1, 0)];
+        } else {
+            log_Z[b] = logaddexpf(alpha[alpha_idx(T_max, Lp_max, b, T_b - 1, Lp_b - 2)],
+                                  alpha[alpha_idx(T_max, Lp_max, b, T_b - 1, Lp_b - 1)]);
+        }
     }
 }
 
@@ -122,9 +124,6 @@ __global__ void ctc_beta_kernel(const float* __restrict__ log_probs,  // (B, T, 
                                 float* __restrict__ grad_logits,      // (B, T, V)
                                 int T_max, int Lp_max, int V, int S_max, bool zero_infinity) {
     const int b = blockIdx.x;  // batch index
-    if (tgt_lens[b] == 0) {
-        return;
-    }
     if (zero_infinity && !isfinite(log_Z[b])) {
         return;
     }
@@ -141,7 +140,9 @@ __global__ void ctc_beta_kernel(const float* __restrict__ log_probs,  // (B, T, 
     }
     if (threadIdx.x == 0) {
         beta_cur[Lp_b - 1] = 0.0;
-        beta_cur[Lp_b - 2] = 0.0;
+        if (Lp_b >= 2) {
+            beta_cur[Lp_b - 2] = 0.0;
+        }
     }
 
     __syncthreads();
