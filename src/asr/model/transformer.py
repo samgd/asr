@@ -162,14 +162,16 @@ class Transformer(torch.nn.Module):
     ):
         super().__init__()
         self.d_model = d_model
-        self.layers = torch.nn.Sequential(
-            *[TransformerBlock(d_model, n_head, is_causal, d_ff, device=device, dtype=dtype) for _ in range(depth)]
+        self.layers = torch.nn.ModuleList(
+            [TransformerBlock(d_model, n_head, is_causal, d_ff, device=device, dtype=dtype) for _ in range(depth)]
         )
 
     def forward(
         self, data: Float[torch.Tensor, "batch seq_len d_model"], seqlens: Integer[torch.Tensor, "batch"] | None = None
     ) -> Float[torch.Tensor, "batch seq_len n_vocab"]:
-        return self.layers(data)
+        for layer in self.layers:
+            data = layer(data, seqlens)
+        return data
 
 
 @dataclass
