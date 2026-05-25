@@ -20,9 +20,8 @@ uv run train \
     dataset.batch_frame_budget=80000 \
     dataset.max_bucket_count=20000 \
 \
-    augment=timemask \
-    augment.max_n_mask_frame=100 \
-    augment.max_prop_mask_frame=0.2 \
+    augment=compose \
+    'augment.transforms=[{_target_: asr.data.augment.TimeMask, max_n_mask_frame: 100, max_prop_mask_frame: 0.2}, {_target_: asr.data.augment.FreqMask, max_n_mask_freq: 27}]' \
 \
     dataloader=bucket \
     dataloader.num_workers=4 
@@ -51,7 +50,6 @@ uv run train \
     'tokenizer.specials=["<blank>"]' \
 \   
     total_steps=10_000 \
-    eval_steps=10 \
     eval_every=500 \
 \    
     optim.lr=0.0001 \
