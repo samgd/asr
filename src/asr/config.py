@@ -4,7 +4,7 @@ from typing import Any
 from hydra.core.config_store import ConfigStore
 from omegaconf import MISSING
 
-from asr.data.augment import TimeMaskConfig
+from asr.data.augment import ComposeConfig, TimeMaskConfig
 from asr.data.bucket_dataset import BucketDatasetConfig
 from asr.data.dataset import BucketDataLoaderConfig, DataLoaderConfig
 from asr.data.librispeech import LibriSpeechConfig
@@ -60,6 +60,7 @@ cs.store(group="normalize", name="global", node=GlobalNormConfig)
 cs.store(group="normalize", name="dynamicpersample", node=DynamicPerSamplePerFeatureNormConfig)
 
 cs.store(group="augment", name="timemask", node=TimeMaskConfig)
+cs.store(group="augment", name="compose", node=ComposeConfig)
 
 cs.store(group="system", name="ctc", node=CTCSystemConfig)
 cs.store(group="system/encoder", name="default", node=EncoderConfig)

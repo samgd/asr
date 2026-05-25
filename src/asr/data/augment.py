@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from typing import Any
 
 import torch
 from omegaconf import MISSING
@@ -41,3 +42,22 @@ class TimeMaskConfig:
     _target_: str = "asr.data.augment.TimeMask"
     max_n_mask_frame: int = MISSING
     max_prop_mask_frame: float = 1.0
+
+
+class Compose(torch.nn.Module):
+    """Apply feature transforms sequentially."""
+
+    def __init__(self, transforms: list[torch.nn.Module]):
+        super().__init__()
+        self.transforms = torch.nn.ModuleList(transforms)
+
+    def forward(self, x: AudioFeatures) -> AudioFeatures:
+        for t in self.transforms:
+            x = t(x)
+        return x
+
+
+@dataclass
+class ComposeConfig:
+    _target_: str = "asr.data.augment.Compose"
+    transforms: list[Any] = MISSING  # list of augmentation configs, each with its own _target_
