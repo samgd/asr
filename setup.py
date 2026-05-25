@@ -27,7 +27,16 @@ setup(
                 "nvcc": [*abi_defines, "-DUSE_CUDA", "-O3", "--use_fast_math"],
             },
             py_limited_api=True,
-        )
+        ),
+        cpp_extension.CppExtension(
+            name="asr.decode._C",
+            sources=[
+                "src/asr/decode/csrc/ctc.cpp",
+            ],
+            extra_compile_args={"cxx": [*abi_defines, "-O3", "-fopenmp"]},
+            extra_link_args=["-fopenmp"],
+            py_limited_api=True,
+        ),
     ],
     cmdclass={"build_ext": cpp_extension.BuildExtension},
     # One wheel for all CPython >= 3.12.
