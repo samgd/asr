@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from typing import cast
 
 import torch
-from einx import rearrange  # pyright: ignore[reportPrivateImportUsage]
+from einx import id as rearrange  # pyright: ignore[reportPrivateImportUsage]
 from jaxtyping import Float, Integer
 from omegaconf import MISSING
 
