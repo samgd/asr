@@ -35,7 +35,6 @@ class CTCSystem(torch.nn.Module):
         with torch.autocast("cuda", dtype=torch.bfloat16):
             enc, xl = self.encoder(x, xl)
             logits = self.head(enc)
-        # log_probs = torch.log_softmax(logits.float(), dim=-1)
         return self.loss(logits, y, xl, yl).mean()
 
     def eval_step(self, batch: Batch) -> list[dict]:
