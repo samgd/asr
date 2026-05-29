@@ -1,0 +1,13 @@
+defaults:
+  - bucket
+  - _self_
+
+feature_dim: 128
+batch_frame_budget: 80000
+max_bucket_count: 4000
+weights: [0.195, 0.369, 0.436]
+boundaries: [191, 928, 1308, 1440, 1532, 1709]
+datasets:
+  - {_target_: asr.data.LibriSpeech, subset: train-clean-100}
+  - {_target_: asr.data.LibriSpeech, subset: train-clean-360}
+  - {_target_: asr.data.LibriSpeech, subset: train-other-500}

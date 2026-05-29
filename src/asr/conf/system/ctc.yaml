@@ -1,0 +1,9 @@
+defaults:
+  - base_ctc
+  - override encoder/frontend: conv2x
+  - override encoder/stem: transformer_base
+  - _self_
+
+loss:
+  zero_infinity: true
+decode: beam

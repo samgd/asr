@@ -1,0 +1,7 @@
+defaults:
+  - compose
+  - _self_
+
+transforms:
+  - {_target_: asr.data.augment.TimeMask, max_n_mask_frame: 100, max_prop_mask_frame: 0.2}
+  - {_target_: asr.data.augment.FreqMask, max_n_mask_freq: 27}

@@ -1,0 +1,7 @@
+defaults:
+  - conv
+  - _self_
+
+layers:
+  - {out_channels: 256, kernel_size: 3, stride: 2, norm: ln, activation: silu}
+  - {out_channels: 512, kernel_size: 3, stride: 2, norm: ln, activation: silu}

@@ -1,0 +1,5 @@
+defaults:
+  - librispeech
+  - _self_
+
+subset: dev-clean

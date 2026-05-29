@@ -64,8 +64,8 @@ cs.store(group="normalize", name="dynamicpersample", node=DynamicPerSamplePerFea
 cs.store(group="augment", name="timemask", node=TimeMaskConfig)
 cs.store(group="augment", name="compose", node=ComposeConfig)
 
-cs.store(group="system", name="ctc", node=CTCSystemConfig)
-cs.store(group="system", name="rnnt", node=RNNTSystemConfig)
+cs.store(group="system", name="base_ctc", node=CTCSystemConfig)
+cs.store(group="system", name="base_rnnt", node=RNNTSystemConfig)
 cs.store(group="system/encoder", name="default", node=EncoderConfig)
 cs.store(group="system/encoder/frontend", name="conv", node=ConvFrontendConfig)
 cs.store(group="system/encoder/stem", name="transformer", node=TransformerConfig)

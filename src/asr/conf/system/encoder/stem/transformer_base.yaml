@@ -1,0 +1,9 @@
+defaults:
+  - transformer
+  - _self_
+
+d_model: 512
+n_head: 8
+is_causal: false
+d_ff: 2048
+depth: 18

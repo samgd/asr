@@ -6,55 +6,30 @@ An experimental repo to play around with automatic speech recognition (ASR) pape
 
 Training is driven by [Hydra](https://hydra.cc/docs/intro/).
 
-Eventually there will be YAML files containing standard configurations for each part -- data, model, loss, etc -- that can be composed for different experiments but for now training is driven by the command line:
+Reusable building blocks and system configs live under [`src/asr/conf/`](src/asr/conf). A training run requires selecting a system config (`system=ctc` / `system=rnnt`, which bundles the model components and loss), the data config, and the remaining per-run settings via the command line. 
+
+The command line permits config file settings to be overridden and, if necessary, a full training run to be configured (although it's verbose!).
+
+### CTC
 
 ```
 uv run train \
-\
-    dataset=bucket \
-    dataset.feature_dim=128 \
-    dataset.normalize=dynamicpersample \
-    'dataset.datasets=[{_target_: asr.data.LibriSpeech, subset: train-clean-100}, {_target_: asr.data.LibriSpeech, subset: train-clean-360}, {_target_: asr.data.LibriSpeech, subset: train-other-500}]' \
-    'dataset.weights=[0.195, 0.369, 0.436]' \
-    'dataset.boundaries=[191, 928, 1308, 1440, 1532, 1709]' \
-    dataset.batch_frame_budget=80000 \
-    dataset.max_bucket_count=20000 \
-\
-    augment=compose \
-    'augment.transforms=[{_target_: asr.data.augment.TimeMask, max_n_mask_frame: 100, max_prop_mask_frame: 0.2}, {_target_: asr.data.augment.FreqMask, max_n_mask_freq: 27}]' \
-\
-    dataloader=bucket \
-    dataloader.num_workers=4 
-\
-    eval_dataset=librispeech \
-    eval_dataset.subset=dev-clean \
-\
-    eval_dataloader.batch_size=64 \
-    eval_dataloader.shuffle=false \
-\
+    dataset=ls960 augment=specaug dataloader=bucket \
+    eval_dataset=dev_clean eval_dataloader=dev \
     system=ctc \
-    system.loss.zero_infinity=true \
-    system.decode=beam \
-\ 
-    system/encoder/frontend=conv \
-    'system.encoder.frontend.layers=[{out_channels: 256, kernel_size: 3, stride: 2, norm: ln, activation: silu}, {out_channels: 512, kernel_size: 3, stride: 2, norm: ln, activation: silu}]' \
-\
-    system/encoder/stem=transformer \
-    system.encoder.stem.d_model=512 \
-    system.encoder.stem.depth=12 \
-    system.encoder.stem.n_head=8 \
-    system.encoder.stem.is_causal=false \
-    system.encoder.stem.d_ff=2048 \
-\
-    tokenizer=char \
-    'tokenizer.specials=["<blank>"]' \
-\   
-    total_steps=10_000 \
-    eval_every=500 \
-\    
-    optim.lr=0.0001 \
-    max_grad_norm=2.0 \
-\
-    device="cuda:1" \
-    logger=tqdm
+    tokenizer=char 'tokenizer.specials=["<blank>"]' \
+    total_steps=10_000 eval_every=500 optim.lr=0.0003 max_grad_norm=2.0 \
+    device="cuda:1" logger=tqdm
+```
+
+### RNN-T Example
+
+```
+uv run train \
+    dataset=ls960 augment=specaug dataloader=bucket \
+    eval_dataset=dev_clean eval_dataloader=dev \
+    system=rnnt \
+    tokenizer=char 'tokenizer.specials=["<blank>", "<sos>"]' \
+    total_steps=10_000 eval_every=500 optim.lr=0.0003 max_grad_norm=2.0 \
+    device="cuda:1" logger=tqdm
 ```

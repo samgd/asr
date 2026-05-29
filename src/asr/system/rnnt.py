@@ -74,7 +74,7 @@ class RNNTSystemConfig:
         default_factory=lambda: [
             "_self_",
             {"encoder": "default"},
-            {"decoder": "default"},
+            {"decoder": "lstm"},
         ]
     )
     _target_: str = "asr.system.rnnt.RNNTSystem"
