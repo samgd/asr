@@ -12,10 +12,12 @@ from asr.data.norm import DynamicPerSamplePerFeatureNormConfig, GlobalNormConfig
 from asr.data.tokenizer import CharTokenizerConfig
 from asr.logging import AimLoggerConfig, TqdmLoggerConfig
 from asr.model.encoder import ConvFrontendConfig, EncoderConfig
+from asr.model.lstm import LSTMConfig
 from asr.model.transformer import TransformerConfig
 from asr.optim import AdamWConfig
 from asr.sched import LinearWarmupCosineDecayConfig
 from asr.system.ctc import CTCSystemConfig
+from asr.system.rnnt import RNNTSystemConfig
 
 
 @dataclass
@@ -63,9 +65,11 @@ cs.store(group="augment", name="timemask", node=TimeMaskConfig)
 cs.store(group="augment", name="compose", node=ComposeConfig)
 
 cs.store(group="system", name="ctc", node=CTCSystemConfig)
+cs.store(group="system", name="rnnt", node=RNNTSystemConfig)
 cs.store(group="system/encoder", name="default", node=EncoderConfig)
 cs.store(group="system/encoder/frontend", name="conv", node=ConvFrontendConfig)
 cs.store(group="system/encoder/stem", name="transformer", node=TransformerConfig)
+cs.store(group="system/decoder", name="lstm", node=LSTMConfig)
 
 cs.store(group="tokenizer", name="char", node=CharTokenizerConfig)
 
