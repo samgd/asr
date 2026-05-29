@@ -21,11 +21,14 @@ setup(
             sources=[
                 "src/asr/loss/csrc/ctc_bindings.cpp",
                 "src/asr/loss/csrc/ctc.cu",
+                "src/asr/loss/csrc/rnnt_bindings.cpp",
+                "src/asr/loss/csrc/rnnt.cu",
             ],
             extra_compile_args={
                 "cxx": abi_defines,
                 "nvcc": [*abi_defines, "-DUSE_CUDA", "-O3", "--use_fast_math"],
             },
+            extra_link_args=["-lcublas"],
             py_limited_api=True,
         ),
         cpp_extension.CppExtension(
