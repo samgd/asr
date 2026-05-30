@@ -52,7 +52,7 @@ uv run train \
 
 - Connectionist Temporal Classification (CTC). [Paper](https://www.cs.toronto.edu/~graves/icml_2006.pdf). Implementation in [CUDA](src/asr/loss/csrc/ctc.cu) with PyTorch stable ABI [bindings](src/asr/loss/csrc/ctc_bindings.cpp).
 - Transducer / RNN-T. [Paper](https://arxiv.org/abs/1211.3711). Implementation in [CUDA](src/asr/loss/csrc/rnnt.cu) with PyTorch stable ABI [bindings](src/asr/loss/csrc/rnnt_bindings.cpp).
-- Token-and-Duration Transducer (TDT). [Paper](https://arxiv.org/abs/2304.06795). Implementation in [CUDA][src/asr/loss/csrc/tdt.cu] with PyTorch stable ABI [bindings](src/asr/loss/csrc/tdt_bindings.cpp).
+- Token-and-Duration Transducer (TDT). [Paper](https://arxiv.org/abs/2304.06795). Implementation in [CUDA](src/asr/loss/csrc/tdt.cu) with PyTorch stable ABI [bindings](src/asr/loss/csrc/tdt_bindings.cpp).
 
 ### Architecture
 
