@@ -23,6 +23,8 @@ setup(
                 "src/asr/loss/csrc/ctc.cu",
                 "src/asr/loss/csrc/rnnt_bindings.cpp",
                 "src/asr/loss/csrc/rnnt.cu",
+                "src/asr/loss/csrc/tdt_bindings.cpp",
+                "src/asr/loss/csrc/tdt.cu",
             ],
             extra_compile_args={
                 "cxx": abi_defines,

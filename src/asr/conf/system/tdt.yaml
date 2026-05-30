@@ -1,0 +1,12 @@
+defaults:
+  - base_tdt
+  - override encoder/frontend: conv2x
+  - override encoder/stem: transformer_base
+  - override decoder: lstm
+  - _self_
+
+loss:
+  tf32: true
+decoder:
+  depth: 2
+  d_model: 512

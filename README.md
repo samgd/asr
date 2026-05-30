@@ -34,12 +34,25 @@ uv run train \
     device="cuda:1" logger=tqdm
 ```
 
+### TDT
+
+```
+uv run train \
+    dataset=ls960 augment=specaug dataloader=bucket \
+    eval_dataset=dev_clean eval_dataloader=dev \
+    system=tdt \
+    tokenizer=char 'tokenizer.specials=["<blank>", "<sos>"]' \
+    total_steps=10_000 eval_every=500 optim.lr=0.0003 max_grad_norm=2.0 \
+    device="cuda:1" logger=tqdm
+```
+
 ## Features
 
 ### Loss
 
 - Connectionist Temporal Classification (CTC). [Paper](https://www.cs.toronto.edu/~graves/icml_2006.pdf). Implementation in [CUDA](src/asr/loss/csrc/ctc.cu) with PyTorch stable ABI [bindings](src/asr/loss/csrc/ctc_bindings.cpp).
 - Transducer / RNN-T. [Paper](https://arxiv.org/abs/1211.3711). Implementation in [CUDA](src/asr/loss/csrc/rnnt.cu) with PyTorch stable ABI [bindings](src/asr/loss/csrc/rnnt_bindings.cpp).
+- Token-and-Duration Transducer (TDT). [Paper](https://arxiv.org/abs/2304.06795). Implementation in [CUDA][src/asr/loss/csrc/tdt.cu] with PyTorch stable ABI [bindings](src/asr/loss/csrc/tdt_bindings.cpp).
 
 ### Architecture
 

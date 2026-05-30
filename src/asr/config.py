@@ -18,6 +18,7 @@ from asr.optim import AdamWConfig
 from asr.sched import LinearWarmupCosineDecayConfig
 from asr.system.ctc import CTCSystemConfig
 from asr.system.rnnt import RNNTSystemConfig
+from asr.system.tdt import TDTSystemConfig
 
 
 @dataclass
@@ -66,6 +67,7 @@ cs.store(group="augment", name="compose", node=ComposeConfig)
 
 cs.store(group="system", name="base_ctc", node=CTCSystemConfig)
 cs.store(group="system", name="base_rnnt", node=RNNTSystemConfig)
+cs.store(group="system", name="base_tdt", node=TDTSystemConfig)
 cs.store(group="system/encoder", name="default", node=EncoderConfig)
 cs.store(group="system/encoder/frontend", name="conv", node=ConvFrontendConfig)
 cs.store(group="system/encoder/stem", name="transformer", node=TransformerConfig)
