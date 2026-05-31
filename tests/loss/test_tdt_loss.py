@@ -42,16 +42,18 @@ def _make_inputs(B, T, U, V, d_model, n_dur, in_lens=None, tgt_lens=None, seed=0
 
 
 @pytest.mark.parametrize(
-    "B,T,U,V,d_model,max_duration,in_lens,tgt_lens",
+    "B,T,U,V,d_model,max_duration,in_lens,tgt_lens,sigma",
     [
-        pytest.param(1, 4, 3, 5, 6, 2, None, None, id="single"),
-        pytest.param(3, 5, 4, 6, 4, 3, None, None, id="batch_fixed"),
-        pytest.param(3, 6, 4, 5, 4, 2, [6, 5, 4], [3, 2, 1], id="variable_lens"),
-        pytest.param(2, 5, 3, 4, 4, 2, [5, 4], [2, 0], id="empty_target_in_batch"),
-        pytest.param(3, 10, 4, 5, 4, 4, [10, 8, 6], [3, 2, 1], id="max_duration_4"),
+        pytest.param(1, 4, 3, 5, 6, 2, None, None, 0.0, id="single"),
+        pytest.param(3, 5, 4, 6, 4, 3, None, None, 0.0, id="batch_fixed"),
+        pytest.param(3, 6, 4, 5, 4, 2, [6, 5, 4], [3, 2, 1], 0.0, id="variable_lens"),
+        pytest.param(2, 5, 3, 4, 4, 2, [5, 4], [2, 0], 0.0, id="empty_target_in_batch"),
+        pytest.param(3, 10, 4, 5, 4, 4, [10, 8, 6], [3, 2, 1], 0.0, id="max_duration_4"),
+        pytest.param(3, 5, 4, 6, 4, 3, None, None, 0.1, id="sigma_0p1"),
+        pytest.param(3, 6, 4, 5, 4, 2, [6, 5, 4], [3, 2, 1], 0.3, id="sigma_0p3_varlen"),
     ],
 )
-def test_gradcheck(B, T, U, V, d_model, max_duration, in_lens, tgt_lens):
+def test_gradcheck(B, T, U, V, d_model, max_duration, in_lens, tgt_lens, sigma):
     """Analytic backward matches numerical gradient for encoder, decoder and both joint heads."""
     durations = _durations(max_duration)
     enc, dec, W, W_dur, targets, in_lens_, tgt_lens_ = _make_inputs(
@@ -63,7 +65,7 @@ def test_gradcheck(B, T, U, V, d_model, max_duration, in_lens, tgt_lens):
     W_dur.requires_grad_(True)
 
     assert torch.autograd.gradcheck(
-        lambda e, d, w, wd: tdt_loss_ref(e, d, w, wd, targets, in_lens_, tgt_lens_, durations, 0),
+        lambda e, d, w, wd: tdt_loss_ref(e, d, w, wd, targets, in_lens_, tgt_lens_, durations, 0, sigma),
         (enc, dec, W, W_dur),
         atol=1e-5,
         rtol=1e-4,
@@ -84,28 +86,30 @@ _CUDA_SHAPES = [
 ]
 
 
-def _ref_double(enc, dec, W, W_dur, targets, in_lens, tgt_lens, durations):
+def _ref_double(enc, dec, W, W_dur, targets, in_lens, tgt_lens, durations, sigma=0.0):
     """Reference loss in float64 — the exact oracle for the float32 kernel."""
     return tdt_loss_ref(
-        enc.double(), dec.double(), W.double(), W_dur.double(), targets, in_lens, tgt_lens, durations, 0
+        enc.double(), dec.double(), W.double(), W_dur.double(), targets, in_lens, tgt_lens, durations, 0, sigma
     )
 
 
 @pytest.mark.cuda
+@pytest.mark.parametrize("sigma", [0.0, 0.05, 0.2], ids=["sigma_0", "sigma_paper", "sigma_0p2"])
 @pytest.mark.parametrize("B,T,U,V,d_model,max_duration,in_lens,tgt_lens", _CUDA_SHAPES)
-def test_cuda_forward_matches_reference(B, T, U, V, d_model, max_duration, in_lens, tgt_lens):
+def test_cuda_forward_matches_reference(B, T, U, V, d_model, max_duration, in_lens, tgt_lens, sigma):
     durations = _durations(max_duration)
     enc, dec, W, W_dur, targets, in_lens_, tgt_lens_ = _make_inputs(
         B, T, U, V, d_model, len(durations), in_lens=in_lens, tgt_lens=tgt_lens, device="cuda", dtype=torch.float32
     )
-    ref = _ref_double(enc, dec, W, W_dur, targets, in_lens_, tgt_lens_, durations)
-    out = tdt_loss(enc, dec, W, W_dur, targets, in_lens_, tgt_lens_, durations, 0)
+    ref = _ref_double(enc, dec, W, W_dur, targets, in_lens_, tgt_lens_, durations, sigma=sigma)
+    out = tdt_loss(enc, dec, W, W_dur, targets, in_lens_, tgt_lens_, durations, 0, sigma=sigma)
     torch.testing.assert_close(out, ref.float(), atol=ATOL, rtol=RTOL)
 
 
 @pytest.mark.cuda
+@pytest.mark.parametrize("sigma", [0.0, 0.05, 0.2], ids=["sigma_0", "sigma_paper", "sigma_0p2"])
 @pytest.mark.parametrize("B,T,U,V,d_model,max_duration,in_lens,tgt_lens", _CUDA_SHAPES)
-def test_cuda_backward_matches_reference(B, T, U, V, d_model, max_duration, in_lens, tgt_lens):
+def test_cuda_backward_matches_reference(B, T, U, V, d_model, max_duration, in_lens, tgt_lens, sigma):
     """All four gradients match the float64 reference path."""
     durations = _durations(max_duration)
     enc, dec, W, W_dur, targets, in_lens_, tgt_lens_ = _make_inputs(
@@ -113,10 +117,10 @@ def test_cuda_backward_matches_reference(B, T, U, V, d_model, max_duration, in_l
     )
 
     e_r, d_r, w_r, wd_r = (t.detach().double().requires_grad_() for t in (enc, dec, W, W_dur))
-    tdt_loss_ref(e_r, d_r, w_r, wd_r, targets, in_lens_, tgt_lens_, durations, 0).sum().backward()
+    tdt_loss_ref(e_r, d_r, w_r, wd_r, targets, in_lens_, tgt_lens_, durations, 0, sigma).sum().backward()
 
     e_c, d_c, w_c, wd_c = (t.detach().clone().requires_grad_() for t in (enc, dec, W, W_dur))
-    tdt_loss(e_c, d_c, w_c, wd_c, targets, in_lens_, tgt_lens_, durations, 0).sum().backward()
+    tdt_loss(e_c, d_c, w_c, wd_c, targets, in_lens_, tgt_lens_, durations, 0, sigma=sigma).sum().backward()
 
     for c, r in zip((e_c, d_c, w_c, wd_c), (e_r, d_r, w_r, wd_r), strict=True):
         torch.testing.assert_close(_grad(c), _grad(r).float(), atol=ATOL, rtol=RTOL)

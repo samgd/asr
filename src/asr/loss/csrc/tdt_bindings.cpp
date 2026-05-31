@@ -10,7 +10,7 @@ tdt_forward_cuda(const torch::stable::Tensor& encoder, const torch::stable::Tens
                  const torch::stable::Tensor& joint_W, const torch::stable::Tensor& joint_W_dur,
                  const torch::stable::Tensor& targets, const torch::stable::Tensor& in_lens,
                  const torch::stable::Tensor& tgt_lens, const torch::stable::Tensor& durations, int64_t max_duration,
-                 int64_t has_zero, int64_t blank_idx, int64_t tf32);
+                 int64_t has_zero, int64_t blank_idx, double sigma, int64_t tf32);
 
 std::tuple<torch::stable::Tensor, torch::stable::Tensor, torch::stable::Tensor, torch::stable::Tensor>
 tdt_backward_cuda(const torch::stable::Tensor& encoder, const torch::stable::Tensor& decoder,
@@ -26,8 +26,8 @@ tdt_backward_cuda(const torch::stable::Tensor& encoder, const torch::stable::Ten
 STABLE_TORCH_LIBRARY_FRAGMENT(asr, m) {
     m.def(
         "tdt_forward(Tensor encoder, Tensor decoder, Tensor joint_W, Tensor joint_W_dur, Tensor targets, "
-        "Tensor in_lens, Tensor tgt_lens, Tensor durations, int max_duration, int has_zero, int blank_idx, int tf32) "
-        "-> (Tensor, Tensor, Tensor, Tensor, Tensor, Tensor)");
+        "Tensor in_lens, Tensor tgt_lens, Tensor durations, int max_duration, int has_zero, int blank_idx, "
+        "float sigma, int tf32) -> (Tensor, Tensor, Tensor, Tensor, Tensor, Tensor)");
     m.def(
         "tdt_backward(Tensor encoder, Tensor decoder, Tensor joint_W, Tensor joint_W_dur, Tensor targets, "
         "Tensor in_lens, Tensor tgt_lens, Tensor durations, int max_duration, int has_zero, int blank_idx, "

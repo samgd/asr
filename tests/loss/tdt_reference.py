@@ -71,6 +71,7 @@ def _edge_logprobs(
     targets: Integer[torch.Tensor, "batch seq"],
     tgt_lens: Integer[torch.Tensor, "batch"],
     blank_idx: int,
+    sigma: float = 0.0,
 ):
     """Token log-probs labelling the two edge *families* leaving each node.
 
@@ -79,11 +80,17 @@ def _edge_logprobs(
     is *not* folded in here -- it is shared across both families at a node and is
     applied per-edge. Identical to the RNN-T reference; only the time advance
     attached to each edge differs.
+
+    ``sigma`` is the logits-under-normalization offset from Xu et al. 2023 §3.3:
+    ``log P'(v | t, u) = log_softmax(h_v) - sigma`` on the token head only. Shifting
+    the two emitted log-probs by ``-sigma`` here is sufficient -- alpha, beta, logZ
+    and the edge posteriors all inherit the under-normalization without further
+    changes. NEG sentinels (invalid label edges) are preserved.
     """
     B, T, U, _ = logp_tok.shape
     device = logp_tok.device
 
-    log_P_blank = logp_tok[..., blank_idx]  # (B, T, U)
+    log_P_blank = logp_tok[..., blank_idx] - sigma  # (B, T, U)
 
     u_ar = torch.arange(U, device=device)
     S = targets.shape[1]
@@ -92,7 +99,7 @@ def _edge_logprobs(
 
     y_at = targets.long()[:, u_ar.clamp(max=S - 1)]  # (B, U)
     y_full = y_at[:, None, :].expand(B, T, U)  # (B, T, U)
-    log_P_y = torch.gather(logp_tok, 3, y_full.unsqueeze(-1)).squeeze(-1)  # (B, T, U)
+    log_P_y = torch.gather(logp_tok, 3, y_full.unsqueeze(-1)).squeeze(-1) - sigma  # (B, T, U)
 
     valid_y = u_ar[None, :] < tgt_lens.long()[:, None]  # (B, U)
     log_P_y = torch.where(valid_y[:, None, :], log_P_y, log_P_y.new_full((), NEG))
@@ -366,9 +373,9 @@ class TDTLossFn(torch.autograd.Function):
     """
 
     @staticmethod
-    def forward(ctx, encoder, decoder, joint_W, joint_W_dur, in_lens, tgt_lens, targets, durations, blank_idx):
+    def forward(ctx, encoder, decoder, joint_W, joint_W_dur, in_lens, tgt_lens, targets, durations, blank_idx, sigma):
         hidden, logp_tok, logp_dur = _joint(encoder, decoder, joint_W, joint_W_dur)
-        log_P_blank, log_P_y = _edge_logprobs(logp_tok, targets, tgt_lens, blank_idx)
+        log_P_blank, log_P_y = _edge_logprobs(logp_tok, targets, tgt_lens, blank_idx, sigma)
         alpha = _alpha(log_P_blank, log_P_y, logp_dur, durations, in_lens, tgt_lens)
         beta = _beta(log_P_blank, log_P_y, logp_dur, durations, in_lens, tgt_lens)
 
@@ -427,7 +434,7 @@ class TDTLossFn(torch.autograd.Function):
             grad_loss,
         )
         # grads line up with forward args: encoder, decoder, joint_W, joint_W_dur, then non-tensors.
-        return grad_encoder, grad_decoder, grad_joint_W, grad_joint_W_dur, None, None, None, None, None
+        return grad_encoder, grad_decoder, grad_joint_W, grad_joint_W_dur, None, None, None, None, None, None
 
 
 def tdt_loss(
@@ -440,10 +447,14 @@ def tdt_loss(
     tgt_lens: Integer[torch.Tensor, "batch"],
     durations: Sequence[int],
     blank_idx: int = 0,
+    sigma: float = 0.0,
 ) -> Float[torch.Tensor, "batch"]:
     """Per-utterance TDT loss, differentiable w.r.t. encoder, decoder and both heads.
 
     ``durations`` is the sequence of frame skips, e.g. ``[0, 1, 2, 3, 4]``; keep
-    ``1`` in it so every frame count is reachable under exact landing.
+    ``1`` in it so every frame count is reachable under exact landing. ``sigma`` is
+    the token-head logits-under-normalization offset from Xu et al. 2023 §3.3.
     """
-    return TDTLossFn.apply(encoder, decoder, joint_W, joint_W_dur, in_lens, tgt_lens, targets, durations, blank_idx)
+    return TDTLossFn.apply(
+        encoder, decoder, joint_W, joint_W_dur, in_lens, tgt_lens, targets, durations, blank_idx, sigma
+    )

@@ -26,6 +26,7 @@ class TDTLossFn(torch.autograd.Function):
         max_duration,
         has_zero,
         blank_idx,
+        sigma,
         tf32,
     ):
         targets = targets.int()
@@ -44,6 +45,7 @@ class TDTLossFn(torch.autograd.Function):
             max_duration,
             has_zero,
             blank_idx,
+            sigma,
             tf32,
         )
         ctx.save_for_backward(
@@ -105,7 +107,7 @@ class TDTLossFn(torch.autograd.Function):
             grad_loss.contiguous(),
             ctx.tf32,
         )
-        nones = (None,) * 8
+        nones = (None,) * 9
         return grad_encoder, grad_decoder, grad_joint_W, grad_joint_W_dur, *nones
 
 
@@ -119,6 +121,7 @@ def tdt_loss(
     tgt_lens: Integer[torch.Tensor, "batch"],
     durations: Sequence[int],
     blank_idx: int = 0,
+    sigma: float = 0.0,
     tf32: bool = False,
 ) -> Float[torch.Tensor, "batch"]:
     """Token-and-Duration (TDT) loss."""
@@ -129,6 +132,8 @@ def tdt_loss(
         raise ValueError(f"durations must be non-negative, got {durations}")
     if 1 not in durations:
         raise ValueError(f"durations must contain 1 so every frame count is reachable, got {durations}")
+    if sigma < 0:
+        raise ValueError(f"sigma must be non-negative, got {sigma}")
     durations_t = torch.as_tensor(durations, dtype=torch.int32, device=encoder.device)
     max_duration = int(max(durations))
     has_zero = int(0 in durations)
@@ -144,6 +149,7 @@ def tdt_loss(
         max_duration,
         has_zero,
         blank_idx,
+        float(sigma),
         int(tf32),
     )
 
@@ -154,6 +160,9 @@ class TDTLoss(torch.nn.Module):
     Args:
         max_duration: Largest frame skip ``D``.
         blank_idx: Vocabulary index of the blank symbol.
+        sigma: Logits-under-normalization offset (Xu et al. 2023 §3.3).
+            Subtracted from log P_token at every node during the
+            forward-backward to bias training toward fewer emissions.
         tf32: Use TF32 tensor cores for the joint GEMMs.
 
     References:
@@ -161,13 +170,14 @@ class TDTLoss(torch.nn.Module):
         https://arxiv.org/abs/2304.06795
     """
 
-    def __init__(self, max_duration: int = 4, blank_idx: int = 0, tf32: bool = False):
+    def __init__(self, max_duration: int = 4, blank_idx: int = 0, sigma: float = 0.0, tf32: bool = False):
         super().__init__()
         if max_duration < 1:
             raise ValueError(f"max_duration must be >= 1, got {max_duration}")
         self.max_duration = max_duration
         self.durations = list(range(max_duration + 1))
         self.blank_idx = blank_idx
+        self.sigma = sigma
         self.tf32 = tf32
 
     def forward(
@@ -190,6 +200,7 @@ class TDTLoss(torch.nn.Module):
             tgt_lens,
             self.durations,
             self.blank_idx,
+            self.sigma,
             self.tf32,
         )
         return loss / tgt_lens.clamp_min(1)
@@ -200,4 +211,5 @@ class TDTLossConfig:
     _target_: str = "asr.loss.tdt.TDTLoss"
     max_duration: int = 4
     blank_idx: int = 0
+    sigma: float = 0.0
     tf32: bool = False

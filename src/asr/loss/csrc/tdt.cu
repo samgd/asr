@@ -136,12 +136,15 @@ __global__ void tdt_build_hidden(const float* __restrict__ encoder,  // (B, T, d
 }
 
 // Token log-softmax over V, keeping only the two slim edge log-probs the lattice needs.
+// `sigma` is the logits-under-normalization offset (Xu et al. 2023 §3.3): subtracting it
+// from log P_token at every node taxes every emission by sigma in log-space, biasing
+// training toward alignments with fewer emissions (and thus longer per-emission durations).
 __global__ void tdt_logsoftmax_tok(const float* __restrict__ logits,  // (Cn, V)
                                    const int* __restrict__ targets,   // (B, S)
                                    const int* __restrict__ tgt_lens,  // (B,)
                                    float* __restrict__ log_P_blank,   // (B, T, U)
                                    float* __restrict__ log_P_y,       // (B, T, U)
-                                   int T, int U, int V, int S, int blank, int c0, int Cn) {
+                                   int T, int U, int V, int S, int blank, float sigma, int c0, int Cn) {
     const int i = blockIdx.x;
     if (i >= Cn) return;
     int b, t, u;
@@ -158,8 +161,8 @@ __global__ void tdt_logsoftmax_tok(const float* __restrict__ logits,  // (Cn, V)
 
     if (threadIdx.x == 0) {
         const int y = (u < tgt_lens[b]) ? targets[tgt_idx(S, b, u)] : -1;
-        log_P_blank[node3(T, U, b, t, u)] = row[blank] - lse;
-        log_P_y[node3(T, U, b, t, u)] = (y >= 0) ? row[y] - lse : NEG;
+        log_P_blank[node3(T, U, b, t, u)] = row[blank] - lse - sigma;
+        log_P_y[node3(T, U, b, t, u)] = (y >= 0) ? row[y] - lse - sigma : NEG;
     }
 }
 
@@ -219,7 +222,8 @@ __global__ void tdt_alpha(const float* __restrict__ log_P_blank,  // (B, T, U)
                 // blank: (s, u) -> (t, u)
                 if (u < U_b) {
                     const float a = alpha[alpha_idx(T, U, b, s, u)];
-                    acc = logaddexpf(acc, a + log_P_blank[node3(T, U, b, s, u)] + log_P_dur[dur_idx(T, U, D, b, s, u, k)]);
+                    acc = logaddexpf(acc,
+                                     a + log_P_blank[node3(T, U, b, s, u)] + log_P_dur[dur_idx(T, U, D, b, s, u, k)]);
                 }
                 // token: (s, u-1) -> (t, u), emitting targets[u-1] (validity baked into log_P_y)
                 if (u >= 1 && u < U_b) {
@@ -252,8 +256,8 @@ __global__ void tdt_alpha(const float* __restrict__ log_P_blank,  // (B, T, U)
             if (U <= blockDim.x) {
                 const int u = threadIdx.x;
                 // leaf multiplier d_u = w_{u-1} (edge u-1 -> u); leaf 0 has no predecessor.
-                sd[u] = (u >= 1) ? (log_P_y[node3(T, U, b, t, u - 1)] + log_P_dur[dur_idx(T, U, D, b, t, u - 1, zk)])
-                                 : NEG;
+                sd[u] =
+                    (u >= 1) ? (log_P_y[node3(T, U, b, t, u - 1)] + log_P_dur[dur_idx(T, U, D, b, t, u - 1, zk)]) : NEG;
                 __syncthreads();
                 for (int o = 1; o < L; o <<= 1) {
                     float cc, dd2;
@@ -313,7 +317,7 @@ __global__ void tdt_betapost(const float* __restrict__ log_P_blank,  // (B, T, U
     const int U_b = tgt_lens[b] + 1;
     const float logZ = log_prob[b];
 
-    extern __shared__ float ring[];  // M rows of U entries: ring[m*U + u] = beta[frame with frame%M==m]
+    extern __shared__ float ring[];     // M rows of U entries: ring[m*U + u] = beta[frame with frame%M==m]
     float* sd = ring + (int64_t)M * U;  // U entries: scan multipliers for the d==0 token chain
 
     for (int idx = threadIdx.x; idx < M * U; idx += blockDim.x) ring[idx] = NEG;
@@ -364,7 +368,8 @@ __global__ void tdt_betapost(const float* __restrict__ log_P_blank,  // (B, T, U
             if (U <= blockDim.x) {
                 const int u = threadIdx.x;
                 // leaf multiplier d_u = w_u (edge u -> u+1); leaf U_b-1 has no successor.
-                sd[u] = (u < U_b - 1) ? (log_P_y[node3(T, U, b, t, u)] + log_P_dur[dur_idx(T, U, D, b, t, u, zk)]) : NEG;
+                sd[u] =
+                    (u < U_b - 1) ? (log_P_y[node3(T, U, b, t, u)] + log_P_dur[dur_idx(T, U, D, b, t, u, zk)]) : NEG;
                 __syncthreads();
                 for (int o = 1; o < Lb; o <<= 1) {
                     float cc, dd2;
@@ -521,7 +526,7 @@ tdt_forward_cuda(const torch::stable::Tensor& encoder, const torch::stable::Tens
                  const torch::stable::Tensor& joint_W, const torch::stable::Tensor& joint_W_dur,
                  const torch::stable::Tensor& targets, const torch::stable::Tensor& in_lens,
                  const torch::stable::Tensor& tgt_lens, const torch::stable::Tensor& durations, int64_t max_duration,
-                 int64_t has_zero, int64_t blank_idx, int64_t tf32) {
+                 int64_t has_zero, int64_t blank_idx, double sigma, int64_t tf32) {
     CHECK_F32_INPUT(encoder);
     CHECK_F32_INPUT(decoder);
     CHECK_F32_INPUT(joint_W);
@@ -570,11 +575,12 @@ tdt_forward_cuda(const torch::stable::Tensor& encoder, const torch::stable::Tens
                                  hidden.const_data_ptr<float>(), d, &zero, logits_tok.mutable_data_ptr<float>(), V));
         // logits_dur (Cn, D) = hidden (Cn, d) @ joint_W_dur^T (d, D)
         CUBLAS_CHECK(cublasSgemm(handle, CUBLAS_OP_T, CUBLAS_OP_N, Dn, Cn, d, &one, joint_W_dur.const_data_ptr<float>(),
-                                 d, hidden.const_data_ptr<float>(), d, &zero, logits_dur.mutable_data_ptr<float>(), Dn));
+                                 d, hidden.const_data_ptr<float>(), d, &zero, logits_dur.mutable_data_ptr<float>(),
+                                 Dn));
         tdt_logsoftmax_tok<<<Cn, NODE_THREADS, red_smem, stream>>>(
             logits_tok.const_data_ptr<float>(), targets.const_data_ptr<int>(), tgt_lens.const_data_ptr<int>(),
-            log_P_blank.mutable_data_ptr<float>(), log_P_y.mutable_data_ptr<float>(), T, U, V, S, (int)blank_idx, c0,
-            Cn);
+            log_P_blank.mutable_data_ptr<float>(), log_P_y.mutable_data_ptr<float>(), T, U, V, S, (int)blank_idx,
+            (float)sigma, c0, Cn);
         tdt_logsoftmax_dur<<<Cn, NODE_THREADS, red_smem, stream>>>(
             logits_dur.const_data_ptr<float>(), log_P_dur.mutable_data_ptr<float>(), T, U, Dn, c0, Cn);
     }
@@ -589,8 +595,8 @@ tdt_forward_cuda(const torch::stable::Tensor& encoder, const torch::stable::Tens
         alpha.mutable_data_ptr<float>(), log_prob.mutable_data_ptr<float>(), loss.mutable_data_ptr<float>(), T, U, Dn,
         (int)has_zero);
 
-    return {std::move(loss),      std::move(alpha),    std::move(log_P_blank),
-            std::move(log_P_y),   std::move(log_P_dur), std::move(log_prob)};
+    return {std::move(loss),    std::move(alpha),     std::move(log_P_blank),
+            std::move(log_P_y), std::move(log_P_dur), std::move(log_prob)};
 }
 
 std::tuple<torch::stable::Tensor, torch::stable::Tensor, torch::stable::Tensor, torch::stable::Tensor>
@@ -666,11 +672,12 @@ tdt_backward_cuda(const torch::stable::Tensor& encoder, const torch::stable::Ten
         CUBLAS_CHECK(cublasSgemm(handle, CUBLAS_OP_T, CUBLAS_OP_N, V, Cn, d, &one, joint_W.const_data_ptr<float>(), d,
                                  hidden.const_data_ptr<float>(), d, &zero, glogit_tok.mutable_data_ptr<float>(), V));
         CUBLAS_CHECK(cublasSgemm(handle, CUBLAS_OP_T, CUBLAS_OP_N, Dn, Cn, d, &one, joint_W_dur.const_data_ptr<float>(),
-                                 d, hidden.const_data_ptr<float>(), d, &zero, glogit_dur.mutable_data_ptr<float>(), Dn));
+                                 d, hidden.const_data_ptr<float>(), d, &zero, glogit_dur.mutable_data_ptr<float>(),
+                                 Dn));
         tdt_build_glogit_tok<<<Cn, NODE_THREADS, red_smem, stream>>>(
-            glogit_tok.mutable_data_ptr<float>(), blank_post.const_data_ptr<float>(), token_post.const_data_ptr<float>(),
-            grad_loss.const_data_ptr<float>(), targets.const_data_ptr<int>(), tgt_lens.const_data_ptr<int>(), T, U, V, S,
-            (int)blank_idx, c0, Cn);
+            glogit_tok.mutable_data_ptr<float>(), blank_post.const_data_ptr<float>(),
+            token_post.const_data_ptr<float>(), grad_loss.const_data_ptr<float>(), targets.const_data_ptr<int>(),
+            tgt_lens.const_data_ptr<int>(), T, U, V, S, (int)blank_idx, c0, Cn);
         tdt_build_glogit_dur<<<Cn, NODE_THREADS, red_smem, stream>>>(
             glogit_dur.mutable_data_ptr<float>(), grad_logp_dur.const_data_ptr<float>(),
             grad_loss.const_data_ptr<float>(), T, U, Dn, c0, Cn);
