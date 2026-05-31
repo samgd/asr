@@ -1,21 +1,19 @@
+from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Any, Literal, Protocol
+from typing import Protocol
 
 import aim
+import torch
 import tqdm
 from omegaconf import II, MISSING
 
 
-@dataclass
-class Event:
-    stage: Literal["train", "eval"]
-    step: int
-    values: dict[str, Any]
-
-
 class Logger(Protocol):
     def set_config(self, config: dict) -> None: ...
-    def append(self, event: Event) -> None: ...
+    def scalar(self, name: str, value: float, *, step: int, stage: str) -> None: ...
+    def scalars(self, values: dict[str, float], *, step: int, stage: str) -> None: ...
+    def distribution(self, name: str, values: torch.Tensor | Sequence[float], *, step: int, stage: str) -> None: ...
+    def text(self, name: str, value: str, *, step: int, stage: str) -> None: ...
     def __enter__(self) -> "Logger": ...
     def __exit__(self, *exc) -> None: ...
 
@@ -28,22 +26,32 @@ class TqdmLogger:
     def set_config(self, config: dict) -> None:
         pass
 
-    def append(self, event: Event):
-        assert self.pbar is not None, (
-            "TqdmLogger.append() called outside its context manager - wrap usage in `with logger: ...`"
-        )
-        match event.stage:
-            case "train":
-                self.pbar.n = event.step
-                self.pbar.set_postfix({k: v for k, v in event.values.items() if v is not None})
-                self.pbar.refresh()
-            case "eval":
-                formatted = " ".join(
-                    f"{k}={v:.4f}" if isinstance(v, float) else f"{k}={v}" for k, v in event.values.items()
-                )
-                self.pbar.write(f"eval @ {event.step}: {formatted}")
-            case _:
-                raise NotImplementedError(f"unknown {event.stage=}")
+    def scalar(self, name: str, value: float, *, step: int, stage: str) -> None:
+        self.scalars({name: value}, step=step, stage=stage)
+
+    def scalars(self, values: dict[str, float], *, step: int, stage: str) -> None:
+        assert self.pbar is not None
+        values = {k: v for k, v in values.items() if v is not None}
+        if stage == "train":
+            self.pbar.n = step
+            self.pbar.set_postfix(values)
+            self.pbar.refresh()
+        else:
+            formatted = " ".join(f"{k}={v:.4f}" if isinstance(v, float) else f"{k}={v}" for k, v in values.items())
+            self.pbar.write(f"{stage} @ {step}: {formatted}")
+
+    def distribution(self, name: str, values: torch.Tensor | Sequence[float], *, step: int, stage: str) -> None:
+        assert self.pbar is not None
+        t = values if isinstance(values, torch.Tensor) else torch.as_tensor(list(values), dtype=torch.float32)
+        if t.numel() == 0:
+            self.pbar.write(f"{stage} @ {step}: {name}: (empty)")
+            return
+        t = t.float()
+        self.pbar.write(f"{stage} @ {step}: {name}: mean={t.mean():.3f} std={t.std():.3f} n={t.numel()}")
+
+    def text(self, name: str, value: str, *, step: int, stage: str) -> None:
+        assert self.pbar is not None
+        self.pbar.write(f"{stage} @ {step}: {name}: {value}")
 
     def __enter__(self) -> "TqdmLogger":
         self.pbar = tqdm.tqdm(total=self.total_steps, desc="train", unit="step", smoothing=0.1)
@@ -63,11 +71,24 @@ class AimLogger:
     def set_config(self, config: dict) -> None:
         self.config = config
 
-    def append(self, event: Event) -> None:
-        assert self.run is not None, (
-            "AimLogger.append() called outside its context manager - wrap usage in `with logger: ...`"
-        )
-        self.run.track(event.values, context={"subset": event.stage}, step=event.step)
+    def scalar(self, name: str, value: float, *, step: int, stage: str) -> None:
+        assert self.run is not None
+        self.run.track(value, name=name, step=step, context={"subset": stage})
+
+    def scalars(self, values: dict[str, float], *, step: int, stage: str) -> None:
+        assert self.run is not None
+        clean = {k: v for k, v in values.items() if v is not None}
+        if clean:
+            self.run.track(clean, context={"subset": stage}, step=step)
+
+    def distribution(self, name: str, values: torch.Tensor | Sequence[float], *, step: int, stage: str) -> None:
+        assert self.run is not None
+        arr = values.detach().cpu().numpy() if isinstance(values, torch.Tensor) else list(values)
+        self.run.track(aim.Distribution(arr), name=name, step=step, context={"subset": stage})
+
+    def text(self, name: str, value: str, *, step: int, stage: str) -> None:
+        assert self.run is not None
+        self.run.track(aim.Text(value), name=name, step=step, context={"subset": stage})
 
     def __enter__(self) -> "Logger":
         self.run = aim.Run(repo=self.repo)

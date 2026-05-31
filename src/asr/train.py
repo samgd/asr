@@ -1,11 +1,9 @@
 from itertools import islice
-from typing import cast
 
 import torch
 
-from asr.data.dataset import Batch
-from asr.logging import Event, Logger
-from asr.system import System
+from asr.logging import Logger
+from asr.system import System, to_device
 
 
 def _repeat(loader):
@@ -34,15 +32,12 @@ class Trainer:
         self.device = device
         self.max_grad_norm = max_grad_norm
 
-    def _to_device(self, batch: Batch) -> Batch:
-        return cast(Batch, tuple(d.to(self.device, non_blocking=True) for d in batch))
-
     def train(self, total_steps: int, eval_steps: int | None, eval_every: int):
         self.system.train()
         with self.logger as logger:
             for step, batch in enumerate(islice(_repeat(self.loader), total_steps), start=1):
                 self.optim.zero_grad()
-                loss = self.system.train_step(self._to_device(batch))
+                loss = self.system.train_step(to_device(batch, self.device))
                 loss.backward()
                 if self.max_grad_norm is not None:
                     norm = torch.nn.utils.clip_grad_norm_(self.system.parameters(), self.max_grad_norm).cpu().item()
@@ -52,21 +47,16 @@ class Trainer:
                 lr = self.sched.get_last_lr()
                 self.sched.step()
 
-                logger.append(Event("train", step, {"loss": loss.item(), "norm": norm, "lr": lr[0]}))
+                metrics = {"loss": loss.item(), "lr": lr[0]}
+                if norm is not None:
+                    metrics["norm"] = norm
+                logger.scalars(metrics, step=step, stage="train")
 
                 if step % eval_every == 0:
-                    metrics = self.eval(eval_steps)
-                    logger.append(Event("eval", step, metrics))
-
-    def eval(self, eval_steps: int | None = None) -> dict:
-        is_training = self.system.training
-        self.system.eval()
-        rows = []
-        for batch in islice(self.eval_loader, eval_steps):
-            with torch.no_grad():
-                rows.extend(self.system.eval_step(self._to_device(batch)))
-        self.system.train(is_training)
-        return {
-            "loss": sum(r["loss"] for r in rows) / len(rows),
-            "wer": 100 * sum(r["wer_edit"] for r in rows) / sum(r["wer_ref_len"] for r in rows),
-        }
+                    # Each system owns its eval loop and logs whatever metrics it chooses.
+                    self.system.evaluate(
+                        islice(self.eval_loader, eval_steps),
+                        logger,
+                        step=step,
+                        device=self.device,
+                    )

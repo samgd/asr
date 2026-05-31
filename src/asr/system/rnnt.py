@@ -1,14 +1,17 @@
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 from typing import Any
 
-import jiwer
 import torch
 from jaxtyping import Float, Integer
 from omegaconf import MISSING
 
 from asr.data.dataset import Batch
 from asr.decode.rnnt import greedy_decode
+from asr.logging import Logger
 from asr.loss.rnnt import RNNTLossConfig
+from asr.system import to_device
+from asr.system.metrics import wer_counts
 
 
 class RNNTSystem(torch.nn.Module):
@@ -51,21 +54,31 @@ class RNNTSystem(torch.nn.Module):
         _, _, _, loss_per = self._step(batch)
         return loss_per.mean()
 
-    def eval_step(self, batch: Batch) -> list[dict]:
-        _, y, _, yl = batch
-        enc, _, xl, loss_per = self._step(batch)
-
-        hyps = greedy_decode(enc.float(), xl, self._predict, self._joint, blank_id=0)
-
-        out = []
-        for i in range(loss_per.shape[0]):
-            ref = self.tokenizer.decode(y[i, : yl[i]].tolist())
-            hyp = self.tokenizer.decode(hyps[i])
-            wo = jiwer.process_words(ref, hyp)
-            edits = wo.substitutions + wo.deletions + wo.insertions
-            ref_len = len(ref.split())
-            out.append({"loss": loss_per[i].item(), "wer_edit": edits, "wer_ref_len": ref_len})
-        return out
+    def evaluate(self, loader: Iterable[Batch], logger: Logger, step: int, device: str | torch.device) -> None:
+        was_training = self.training
+        self.eval()
+        losses: list[float] = []
+        edits, ref_words = 0, 0
+        for batch in loader:
+            batch = to_device(batch, device)
+            _, y, _, yl = batch
+            with torch.no_grad():
+                enc, _, xl, loss_per = self._step(batch)
+                hyps = greedy_decode(enc.float(), xl, self._predict, self._joint, blank_id=0)
+            losses.extend(loss_per.tolist())
+            for i in range(loss_per.shape[0]):
+                ref = self.tokenizer.decode(y[i, : yl[i]].tolist())
+                hyp = self.tokenizer.decode(hyps[i])
+                e, w = wer_counts(ref, hyp)
+                edits += e
+                ref_words += w
+        self.train(was_training)
+        if losses:
+            logger.scalars(
+                {"loss": sum(losses) / len(losses), "wer": 100 * edits / max(ref_words, 1)},
+                step=step,
+                stage="eval",
+            )
 
 
 @dataclass

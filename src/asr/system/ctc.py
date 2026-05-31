@@ -1,14 +1,17 @@
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
-import jiwer
 import torch
 from jaxtyping import Float
 from omegaconf import MISSING
 
 from asr.data.dataset import Batch
 from asr.decode.ctc import beam_decode, greedy_decode
+from asr.logging import Logger
 from asr.loss.ctc import CTCLossConfig
+from asr.system import to_device
+from asr.system.metrics import wer_counts
 
 
 class CTCSystem(torch.nn.Module):
@@ -37,23 +40,33 @@ class CTCSystem(torch.nn.Module):
             logits = self.head(enc)
         return self.loss(logits, y, xl, yl).mean()
 
-    def eval_step(self, batch: Batch) -> list[dict]:
-        x, y, xl, yl = batch
-        with torch.autocast("cuda", dtype=torch.bfloat16):
-            enc, xl = self.encoder(x, xl)
-            logits = self.head(enc)
-        log_probs = torch.log_softmax(logits.float(), dim=-1)
-        loss_per = self.loss(logits, y, xl, yl)
-        hyps = self.decode_fn(log_probs, xl)
-        out = []
-        for i in range(loss_per.shape[0]):
-            ref = self.tokenizer.decode(y[i, : yl[i]].tolist())
-            hyp = self.tokenizer.decode(hyps[i])
-            wo = jiwer.process_words(ref, hyp)
-            edits = wo.substitutions + wo.deletions + wo.insertions
-            ref_len = len(ref.split())
-            out.append({"loss": loss_per[i].item(), "wer_edit": edits, "wer_ref_len": ref_len})
-        return out
+    def evaluate(self, loader: Iterable[Batch], logger: Logger, step: int, device: str | torch.device) -> None:
+        was_training = self.training
+        self.eval()
+        losses: list[float] = []
+        edits, ref_words = 0, 0
+        for batch in loader:
+            batch = to_device(batch, device)
+            x, y, xl, yl = batch
+            with torch.no_grad(), torch.autocast("cuda", dtype=torch.bfloat16):
+                enc, xl = self.encoder(x, xl)
+                logits = self.head(enc)
+            log_probs = torch.log_softmax(logits.float(), dim=-1)
+            losses.extend(self.loss(logits, y, xl, yl).tolist())
+            hyps = self.decode_fn(log_probs, xl)
+            for i in range(len(hyps)):
+                ref = self.tokenizer.decode(y[i, : yl[i]].tolist())
+                hyp = self.tokenizer.decode(hyps[i])
+                e, w = wer_counts(ref, hyp)
+                edits += e
+                ref_words += w
+        self.train(was_training)
+        if losses:
+            logger.scalars(
+                {"loss": sum(losses) / len(losses), "wer": 100 * edits / max(ref_words, 1)},
+                step=step,
+                stage="eval",
+            )
 
 
 @dataclass

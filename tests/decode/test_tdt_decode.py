@@ -1,4 +1,3 @@
-# Generated with Claude Code (https://claude.com/claude-code). Opus 4.8 xhigh.
 import torch
 
 from asr.decode.tdt import greedy_decode
@@ -38,12 +37,13 @@ def _frames(plan, T, V, durations, default=(BLANK, 1)):
 
 
 def _decode(enc, T_b, V, durations, **kw):
+    """Decode a single utterance; returns just the hyp (see greedy_decode for full output)."""
     joint, joint_dur = _split_joints(V)
     in_lens = torch.tensor([T_b])
-    # durations are always range(D+1), so the duration head width is max(durations)+1.
-    return greedy_decode(
+    hyps, _ = greedy_decode(
         enc, in_lens, _zero_predict(enc.shape[-1]), joint, joint_dur, max(durations), blank_id=BLANK, **kw
     )
+    return hyps
 
 
 def test_duration_one_emits_one_token_per_frame():
@@ -98,6 +98,21 @@ def test_batch_with_different_in_lens():
         enc[:, t, 2] = 10.0
         enc[:, t, V + durations.index(1)] = 10.0
     in_lens = torch.tensor([6, 3])
-    hyps = greedy_decode(enc, in_lens, _zero_predict(enc.shape[-1]), joint, joint_dur, max(durations), blank_id=BLANK)
+    hyps, _ = greedy_decode(
+        enc, in_lens, _zero_predict(enc.shape[-1]), joint, joint_dur, max(durations), blank_id=BLANK
+    )
     assert hyps[0] == [2, 2, 2, 2, 2, 2]
     assert hyps[1] == [2, 2, 2]  # second utterance only 3 valid frames
+
+
+def test_returns_chosen_durations_per_utterance():
+    """The decoder's second return value records every argmax duration the model picked."""
+    V, durations, T = 6, [0, 1, 2], 5
+    enc = _frames({t: (2, 1) for t in range(T)}, T, V, durations)
+    joint, joint_dur = _split_joints(V)
+    hyps, durs = greedy_decode(
+        enc, torch.tensor([T]), _zero_predict(enc.shape[-1]), joint, joint_dur, max(durations), blank_id=BLANK
+    )
+    # 5 frames, every frame emits token 2 at duration 1, decoder advances one step per frame.
+    assert hyps[0] == [2, 2, 2, 2, 2]
+    assert durs[0] == [1, 1, 1, 1, 1]
