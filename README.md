@@ -44,6 +44,7 @@ uv run train \
     tokenizer=char 'tokenizer.specials=["<blank>", "<sos>"]' \
     total_steps=10_000 eval_every=500 optim.lr=0.0003 max_grad_norm=2.0 \
     device="cuda:1" logger=tqdm
+    # add system.loss.sigma=0.05 to bias toward longer durations
 ```
 
 ## Features
