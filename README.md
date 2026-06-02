@@ -2,6 +2,21 @@
 
 An experimental repo to play around with automatic speech recognition (ASR) papers and ideas.
 
+- [Usage](#usage)
+  - [CTC](#ctc)
+  - [RNN-T](#rnn-t)
+  - [TDT](#tdt)
+- [Features](#features)
+  - [Loss](#loss)
+  - [Architecture](#architecture)
+  - [Dataset](#dataset)
+  - [Data Normalization](#data-normalization)
+  - [Data Augmentation](#data-augmentation)
+  - [Data Batching](#data-batching)
+  - [Logging](#logging)
+- [Example Training](#example-training)
+  - [TDT](#tdt-1)
+
 ## Usage
 
 Training is driven by [Hydra](https://hydra.cc/docs/intro/).
