@@ -82,3 +82,11 @@ uv run train \
 
 - tqdm. [Website](https://github.com/tqdm/tqdm).
 - Aim. [Website](https://github.com/aimhubio/aim).
+
+## Example Training
+
+### TDT
+
+Small scale training, <2 days on an NVIDIA 3090:
+
+![TDT Training](plots/tdt_100k.svg)
