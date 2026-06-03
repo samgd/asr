@@ -66,15 +66,13 @@ uv run train \
 
 ### BPE
 
-First produce a BPE tokenizer.
-
-This generates one containing 1022 tokens so the tokenizer instance can add `<blank>` and `<sos>` symbols for the RNN-T and TDT losses bringing it to 1024. For CTC use 1023 and remove `<sos>` from the training command below:
+The above usage examples use character-level tokenization. To switch to byte pair encoding (BPE) a model is required. This command generates one containing 1022 tokens so the tokenizer instance can add `<blank>` and `<sos>` symbols for the RNN-T and TDT losses bringing it to 1024 (power of 2). For CTC use 1023 and remove `<sos>` from the example training command below:
 
 ```
 uv run train-bpe trainer.vocab_size=1022 output_dir=models/tokenizers/ls960_bpe1022/
 ```
 
-Then train a model as per any of the above commands but switching the tokenizer line for:
+Then train a speech recognition model as per any of the commands above but switching the tokenizer line for:
 
 ```
 ...
