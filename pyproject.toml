@@ -14,6 +14,7 @@ dependencies = [
   "matplotlib>=3.10.9",
   "ninja>=1.13.0",
   "nvidia-npp>=13.1.0.48",
+  "sentencepiece>=0.2.1",
   "torch>=2.11.0",
   "torchaudio>=2.11.0",
   "torchcodec>=0.11",
@@ -25,6 +26,7 @@ dependencies = [
 train = "asr.cli.train:main"
 bucket-boundaries = "asr.cli.bucket_boundaries:main"
 compute-norm-stats = "asr.cli.compute_norm_stats:main"
+train-bpe = "asr.cli.train_bpe:main"
 
 [build-system]
 requires = ["setuptools>=77", "wheel", "torch>=2.11.0", "numpy"]

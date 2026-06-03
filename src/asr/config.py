@@ -9,7 +9,7 @@ from asr.data.bucket_dataset import BucketDatasetConfig
 from asr.data.dataset import BucketDataLoaderConfig, DataLoaderConfig
 from asr.data.librispeech import LibriSpeechConfig
 from asr.data.norm import DynamicPerSamplePerFeatureNormConfig, GlobalNormConfig
-from asr.data.tokenizer import CharTokenizerConfig
+from asr.data.tokenizer import BPETokenizerConfig, CharTokenizerConfig
 from asr.logging import AimLoggerConfig, TqdmLoggerConfig
 from asr.model.encoder import ConvFrontendConfig, EncoderConfig
 from asr.model.lstm import LSTMConfig
@@ -74,6 +74,7 @@ cs.store(group="system/encoder/stem", name="transformer", node=TransformerConfig
 cs.store(group="system/decoder", name="lstm", node=LSTMConfig)
 
 cs.store(group="tokenizer", name="char", node=CharTokenizerConfig)
+cs.store(group="tokenizer", name="bpe", node=BPETokenizerConfig)
 
 cs.store(group="dataset", name="librispeech", node=LibriSpeechConfig)
 cs.store(group="dataset", name="bucket", node=BucketDatasetConfig)

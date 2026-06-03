@@ -1,4 +1,5 @@
 import os
+from collections.abc import Iterator
 from dataclasses import dataclass
 from typing import Any, Literal
 
@@ -10,18 +11,26 @@ from torchaudio.transforms import MelSpectrogram
 
 from asr.data.dataset import FeatureTransform, Sample
 
+Subset = Literal[
+    "dev-clean",
+    "dev-other",
+    "test-clean",
+    "test-other",
+    "train-clean-100",
+    "train-clean-360",
+    "train-other-500",
+]
+
+
+def transcripts(subset: Subset, root: str | None = None, download: bool = False) -> Iterator[str]:
+    if root is None:
+        root = os.environ["DATA_ROOT"]
+    base = LIBRISPEECH(root=root, url=subset, download=download)
+    for i in range(len(base)):
+        yield base.get_metadata(i)[2]
+
 
 class LibriSpeech(Dataset[Sample]):
-    Subset = Literal[
-        "dev-clean",
-        "dev-other",
-        "test-clean",
-        "test-other",
-        "train-clean-100",
-        "train-clean-360",
-        "train-other-500",
-    ]
-
     def __init__(
         self,
         subset: Subset,
@@ -67,6 +76,14 @@ class LibriSpeech(Dataset[Sample]):
             feats = self.augment(feats)
         ids = torch.tensor(self.tok.encode(text), dtype=torch.long)
         return feats, ids
+
+
+@dataclass
+class LibriSpeechTranscriptsConfig:
+    _target_: str = "asr.data.librispeech.transcripts"
+    subset: str = MISSING
+    root: str | None = None
+    download: bool = False
 
 
 @dataclass

@@ -6,9 +6,11 @@ An experimental repo to play around with automatic speech recognition (ASR) pape
   - [CTC](#ctc)
   - [RNN-T](#rnn-t)
   - [TDT](#tdt)
+  - [BPE](#bpe)
 - [Features](#features)
   - [Loss](#loss)
   - [Architecture](#architecture)
+  - [Tokenizer](#tokenizer)
   - [Dataset](#dataset)
   - [Data Normalization](#data-normalization)
   - [Data Augmentation](#data-augmentation)
@@ -62,6 +64,24 @@ uv run train \
     # add system.loss.sigma=0.05 to bias toward longer durations
 ```
 
+### BPE
+
+First produce a BPE tokenizer.
+
+This generates one containing 1022 tokens so the tokenizer instance can add `<blank>` and `<sos>` symbols for the RNN-T and TDT losses bringing it to 1024. For CTC use 1023 and remove `<sos>` from the training command below:
+
+```
+uv run train-bpe trainer.vocab_size=1022 output_dir=models/tokenizers/ls960_bpe1022/
+```
+
+Then train a model as per any of the above commands but switching the tokenizer line for:
+
+```
+...
+    tokenizer=bpe tokenizer.model_dir=models/tokenizers/ls960_bpe1022 'tokenizer.specials=["<blank>", "<sos>"]' \
+...
+```
+
 ## Features
 
 ### Loss
@@ -75,6 +95,11 @@ uv run train \
 - Transformer (RoPE, SwiGLU, Prenorm). [Implementation](src/asr/model/transformer.py).
 - LSTM stack. Wraps PyTorch, [implementation](src/asr/model/lstm.py).
 - Conv subsampling frontend, [implementation](src/asr/model/encoder.py).
+
+### Tokenizer
+
+- Character. [Implementation](src/asr/data/tokenizer.py).
+- Byte pair encoding (BPE), via [SentencePiece](https://github.com/google/sentencepiece). [Paper](https://arxiv.org/abs/1508.07909).
 
 ### Dataset
 
