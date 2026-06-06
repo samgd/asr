@@ -1,0 +1,6 @@
+defaults:
+  - augment
+  - _self_
+
+audio:
+  - {_target_: asr.data.augment.SpeedPerturbation, orig_freq: 16000, factors: [0.9, 1.0, 1.1]}

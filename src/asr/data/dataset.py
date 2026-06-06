@@ -7,8 +7,10 @@ from jaxtyping import Float, Int64
 from omegaconf import MISSING
 
 AudioFeatures = Float[torch.Tensor, "n_frames n_feats"]
+Waveform = Float[torch.Tensor, "channels n_samples"]
 
 FeatureTransform = Callable[[AudioFeatures], AudioFeatures]
+AudioTransform = Callable[[Waveform], Waveform]
 
 Sample = tuple[
     AudioFeatures,

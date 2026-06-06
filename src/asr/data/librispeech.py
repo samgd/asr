@@ -9,6 +9,7 @@ from torch.utils.data import Dataset
 from torchaudio.datasets import LIBRISPEECH
 from torchaudio.transforms import MelSpectrogram
 
+from asr.data.augment import Augment
 from asr.data.dataset import FeatureTransform, Sample
 
 Subset = Literal[
@@ -44,7 +45,7 @@ class LibriSpeech(Dataset[Sample]):
         f_max: float | None = 8000.0,
         root: str | None = None,
         normalize: FeatureTransform | None = None,
-        augment: FeatureTransform | None = None,
+        augment: Augment | None = None,
         download: bool = False,
         **kwargs,
     ):
@@ -69,11 +70,13 @@ class LibriSpeech(Dataset[Sample]):
 
     def __getitem__(self, i: int) -> Sample:
         wav, _, text, *_ = self.base[i]
+        if self.augment is not None:
+            wav = self.augment.audio_forward(wav)
         feats = self.mel(wav).squeeze(0).clamp(min=1e-10).log().T
         if self.normalize is not None:
             feats = self.normalize(feats)
         if self.augment is not None:
-            feats = self.augment(feats)
+            feats = self.augment.feature_forward(feats)
         ids = torch.tensor(self.tok.encode(text), dtype=torch.long)
         return feats, ids
 

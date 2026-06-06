@@ -14,10 +14,11 @@ def main(cfg: DictConfig) -> None:
     tokenizer = hydra.utils.instantiate(cfg.tokenizer)
 
     if cfg.dataset._target_.endswith("BucketDataset"):
-        inner = [hydra.utils.instantiate(d, tokenizer=tokenizer) for d in cfg.dataset.datasets]
-        dataset = hydra.utils.instantiate(
-            cfg.dataset, datasets=inner, normalize=normalize, augment=augment, _recursive_=False
-        )
+        inner = [
+            hydra.utils.instantiate(d, tokenizer=tokenizer, normalize=normalize, augment=augment)
+            for d in cfg.dataset.datasets
+        ]
+        dataset = hydra.utils.instantiate(cfg.dataset, datasets=inner, _recursive_=False)
     else:
         dataset = hydra.utils.instantiate(cfg.dataset, normalize=normalize, augment=augment, tokenizer=tokenizer)
 

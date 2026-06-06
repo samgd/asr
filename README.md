@@ -31,7 +31,7 @@ The command line permits config file settings to be overridden and, if necessary
 
 ```
 uv run train \
-    dataset=ls960 augment=specaug dataloader=bucket \
+    dataset=ls960 augment=speed_specaug dataloader=bucket \
     eval_dataset=dev_clean eval_dataloader=dev \
     system=ctc \
     tokenizer=char 'tokenizer.specials=["<blank>"]' \
@@ -43,7 +43,7 @@ uv run train \
 
 ```
 uv run train \
-    dataset=ls960 augment=specaug dataloader=bucket \
+    dataset=ls960 augment=speed_specaug dataloader=bucket \
     eval_dataset=dev_clean eval_dataloader=dev \
     system=rnnt \
     tokenizer=char 'tokenizer.specials=["<blank>", "<sos>"]' \
@@ -55,7 +55,7 @@ uv run train \
 
 ```
 uv run train \
-    dataset=ls960 augment=specaug dataloader=bucket \
+    dataset=ls960 augment=speed_specaug dataloader=bucket \
     eval_dataset=dev_clean eval_dataloader=dev \
     system=tdt \
     tokenizer=char 'tokenizer.specials=["<blank>", "<sos>"]' \
@@ -111,6 +111,7 @@ Then train a speech recognition model as per any of the commands above but switc
 ### Data Augmentation
 
 - SpecAugment time and frequency masking. [Paper](https://arxiv.org/abs/1904.08779).
+- Speed perturbation. [Paper](https://www.isca-archive.org/interspeech_2015/ko15_interspeech.html).
 
 ### Data Batching
 

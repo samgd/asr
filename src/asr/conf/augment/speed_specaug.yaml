@@ -2,6 +2,9 @@ defaults:
   - augment
   - _self_
 
+audio:
+  - {_target_: asr.data.augment.SpeedPerturbation, orig_freq: 16000, factors: [0.9, 1.0, 1.1]}
+
 feature:
   - {_target_: asr.data.augment.TimeMask, max_n_mask_frame: 100, max_prop_mask_frame: 0.2}
   - {_target_: asr.data.augment.FreqMask, max_n_mask_freq: 27}
