@@ -126,6 +126,6 @@ Then train a speech recognition model as per any of the commands above but switc
 
 ### TDT
 
-Small scale training, <2 days on an NVIDIA 3090:
+Small scale training, 32 hours on a single NVIDIA 3090:
 
 ![TDT Training](plots/tdt_100k.svg)
