@@ -23,7 +23,7 @@ An experimental repo to play around with automatic speech recognition (ASR) pape
 
 Training is driven by [Hydra](https://hydra.cc/docs/intro/).
 
-Reusable building blocks and system configs live under [`src/asr/conf/`](src/asr/conf). A training run requires selecting a system config (`system=ctc` / `system=rnnt`, which bundles the model components and loss), the data configs, and the remaining per-run settings via the command line. 
+Reusable building blocks and system configs live under [`src/asr/conf/`](src/asr/conf). A training run requires selecting a system config (`system={ctc, rnnt, tdt}` which bundles the model components and loss), the data configs, and the remaining per-run settings via the command line. 
 
 The command line permits config file settings to be overridden and, if necessary, a full training run to be configured (although it's verbose!).
 
